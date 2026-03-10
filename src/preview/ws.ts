@@ -4,6 +4,7 @@ import { transpileTsx } from "./transpile.js";
 
 export interface WsBroadcaster {
   broadcast: (code: string, compiledJs: string) => void;
+  getLastPreview: () => { code: string; compiledJs: string } | null;
 }
 
 /**
@@ -16,6 +17,7 @@ export interface WsBroadcaster {
 export function createWsServer(server: http.Server): WsBroadcaster {
   const wss = new WebSocketServer({ server });
   const clients = new Set<WebSocket>();
+  let lastPreview: { code: string; compiledJs: string } | null = null;
 
   wss.on("connection", (ws) => {
     clients.add(ws);
@@ -65,6 +67,7 @@ export function createWsServer(server: http.Server): WsBroadcaster {
   });
 
   function broadcast(code: string, compiledJs: string): void {
+    lastPreview = { code, compiledJs };
     const payload = JSON.stringify({ type: "update", code, compiledJs });
 
     for (const client of clients) {
@@ -74,5 +77,9 @@ export function createWsServer(server: http.Server): WsBroadcaster {
     }
   }
 
-  return { broadcast };
+  function getLastPreview() {
+    return lastPreview;
+  }
+
+  return { broadcast, getLastPreview };
 }

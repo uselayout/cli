@@ -34,6 +34,48 @@ export interface PreviewServer {
   close: () => void;
 }
 
+/** Build a standalone HTML page for Figma capture (no chrome/iframe). */
+function buildCaptureHtml(compiledJs: string): string {
+  const escapedJs = JSON.stringify(compiledJs)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e");
+
+  return [
+    "<!DOCTYPE html>",
+    "<html><head>",
+    '<meta charset="UTF-8" />',
+    '<meta name="viewport" content="width=device-width, initial-scale=1.0" />',
+    '<script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async></script>',
+    '<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>',
+    '<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>',
+    '<script src="https://cdn.tailwindcss.com"></script>',
+    "<style>body { margin: 0; }</style>",
+    "</head><body>",
+    '<div id="root"></div>',
+    "<script>",
+    "try {",
+    "  var exports = {};",
+    "  var module = { exports: exports };",
+    "  function require(name) {",
+    '    if (name === "react" || name === "React") return React;',
+    '    if (name === "react-dom" || name === "react-dom/client" || name === "ReactDOM") return ReactDOM;',
+    '    throw new Error("Cannot require: " + name);',
+    "  }",
+    "  var s = document.createElement('script');",
+    "  s.textContent = " + escapedJs + ";",
+    "  document.body.appendChild(s);",
+    "  var Component = module.exports.default || module.exports;",
+    '  if (typeof Component === "function") {',
+    '    ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(Component));',
+    "  }",
+    "} catch(e) {",
+    '  document.getElementById("root").textContent = e.message;',
+    "}",
+    "</script>",
+    "</body></html>",
+  ].join("\n");
+}
+
 /**
  * Start the preview HTTP + WebSocket server.
  *
@@ -48,7 +90,9 @@ export function startPreviewServer(
     const htmlContent = fs.readFileSync(htmlPath, "utf-8");
 
     const server = http.createServer((req, res) => {
-      if (req.method === "GET" && (req.url === "/" || req.url === "")) {
+      const url = req.url?.split("?")[0] ?? "";
+
+      if (req.method === "GET" && (url === "/" || url === "")) {
         res.writeHead(200, {
           "Content-Type": "text/html; charset=utf-8",
           "Cache-Control": "no-cache",
@@ -57,11 +101,28 @@ export function startPreviewServer(
         return;
       }
 
+      // Standalone capture page — renders component without preview chrome.
+      // Used by Figma MCP's generate_figma_design to capture the component.
+      if (req.method === "GET" && url === "/capture") {
+        const last = getLastPreview();
+        if (!last) {
+          res.writeHead(404, { "Content-Type": "text/plain" });
+          res.end("No component previewed yet. Send code via the preview tool first.");
+          return;
+        }
+        res.writeHead(200, {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "no-cache",
+        });
+        res.end(buildCaptureHtml(last.compiledJs));
+        return;
+      }
+
       res.writeHead(404, { "Content-Type": "text/plain" });
       res.end("Not Found");
     });
 
-    const { broadcast } = createWsServer(server);
+    const { broadcast, getLastPreview } = createWsServer(server);
 
     server.on("error", (err: NodeJS.ErrnoException) => {
       if (err.code === "EADDRINUSE") {

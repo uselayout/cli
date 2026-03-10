@@ -20,6 +20,7 @@ export const inputSchema = {
 export function handler(kit: Kit | null) {
   return async ({ code, name: frameName }: { code: string; name?: string }) => {
     const resolvedName = frameName ?? "SuperDuper Component";
+    const captureUrl = `http://localhost:${PREVIEW_PORT}/capture`;
     const previewUrl = `http://localhost:${PREVIEW_PORT}`;
 
     // Build token context for Figma rendering
@@ -53,11 +54,13 @@ export function handler(kit: Kit | null) {
       "",
       "## Next Step",
       "",
-      "Call Figma MCP's `generate_figma_design` tool to capture the live preview:",
+      "Call Figma MCP's `generate_figma_design` tool to capture the standalone component page:",
       "",
-      `1. The component is running at **${previewUrl}**`,
-      `2. Use \`generate_figma_design\` to capture it into your Figma file`,
-      `3. Name the frame: **${resolvedName}**`,
+      `1. **Use this URL for capture:** ${captureUrl}`,
+      "   This serves the component standalone (no preview chrome) for clean Figma capture.",
+      `2. The interactive preview with toolbar is at ${previewUrl}`,
+      `3. Use \`generate_figma_design\` with \`outputMode: "existingFile"\` to capture into your Figma file`,
+      `4. Name the frame: **${resolvedName}**`,
       "",
       "## Setup (if Figma MCP is not connected)",
       "",
@@ -79,6 +82,7 @@ export function handler(kit: Kit | null) {
       "```",
       tokenContext,
       "",
+      `**Capture URL:** ${captureUrl}`,
       `**Preview URL:** ${previewUrl}`,
       `**Frame name:** ${resolvedName}`,
     ].join("\n");
