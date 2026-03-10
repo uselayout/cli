@@ -1,0 +1,12 @@
+{
+  "name": "notion-lite",
+  "version": "1.0.0",
+  "displayName": "Notion",
+  "description": "Content-first, block-based design system inspired by Notion",
+  "source": "website-extraction",
+  "tier": "free",
+  "tokenCount": 22,
+  "componentCount": 5,
+  "aesthetic": "Light, content-first, block-based",
+  "superduperUrl": "https://superduperui.com/kits/notion"
+}

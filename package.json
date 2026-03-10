@@ -1,0 +1,63 @@
+{
+  "name": "@superduperui/context",
+  "version": "0.1.0",
+  "description": "Design system context for AI coding agents — MCP server + CLI + live preview",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "superduperui-context": "./dist/bin/cli.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "kits",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc && mkdir -p dist/src/preview/static && cp src/preview/static/index.html dist/src/preview/static/index.html",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit",
+    "serve": "node dist/bin/cli.js serve",
+    "preview": "node dist/bin/cli.js serve"
+  },
+  "keywords": [
+    "mcp",
+    "design-system",
+    "design-tokens",
+    "ai",
+    "claude",
+    "cursor",
+    "figma",
+    "codex",
+    "windsurf",
+    "copilot"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/superduperui/context"
+  },
+  "homepage": "https://superduperui.com/ai-studio",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "commander": "^13.1.0",
+    "chalk": "^5.4.1",
+    "ws": "^8.18.0",
+    "open": "^10.1.0",
+    "typescript": "^5.7.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "@types/ws": "^8.5.14"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

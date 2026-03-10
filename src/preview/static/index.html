@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SuperDuper Preview</title>
+  <script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-app: #0C0C0E;
+      --bg-panel: #111115;
+      --bg-surface: #17171C;
+      --bg-elevated: #1E1E24;
+      --bg-hover: #24242B;
+      --border: rgba(255,255,255,0.07);
+      --border-strong: rgba(255,255,255,0.14);
+      --accent: #6366F1;
+      --accent-hover: #7577F3;
+      --text-primary: #E8E8F0;
+      --text-secondary: rgba(232,232,240,0.55);
+      --text-muted: rgba(232,232,240,0.35);
+      --ease: cubic-bezier(0.0, 0.0, 0.2, 1);
+    }
+
+    body {
+      background: var(--bg-app);
+      color: var(--text-primary);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Toolbar */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .toolbar-group {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      background: var(--bg-surface);
+      border-radius: 6px;
+      padding: 2px;
+    }
+
+    .toolbar-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border: none;
+      border-radius: 4px;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 150ms var(--ease);
+      white-space: nowrap;
+    }
+
+    .toolbar-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+    .toolbar-btn.active { background: var(--accent); color: white; }
+
+    .toolbar-spacer { flex: 1; }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #ef4444;
+      transition: background 300ms var(--ease);
+    }
+
+    .status-dot.connected { background: #22c55e; }
+
+    /* Main content */
+    .main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* Preview area */
+    .preview-area {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      overflow: auto;
+      background: var(--bg-app);
+    }
+
+    .preview-container {
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-sizing: border-box;
+      border: 1px solid var(--border-strong);
+      transition: width 300ms var(--ease);
+      height: 100%;
+      display: flex;
+    }
+
+    .preview-container.dark-content {
+      background: #1a1a2e;
+    }
+
+    .preview-container[data-viewport="mobile"] { width: 375px; }
+    .preview-container[data-viewport="tablet"] { width: 768px; }
+    .preview-container[data-viewport="desktop"] { width: 100%; max-width: 1280px; }
+
+    .preview-iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+
+    /* Source panel */
+    .source-panel {
+      width: 400px;
+      background: var(--bg-panel);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      transition: width 200ms var(--ease);
+      overflow: hidden;
+    }
+
+    .source-panel.collapsed { width: 0; }
+
+    .source-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .source-close {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 16px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      transition: all 150ms var(--ease);
+    }
+
+    .source-close:hover { color: var(--text-primary); background: var(--bg-hover); }
+
+    .source-code {
+      flex: 1;
+      overflow: auto;
+      padding: 16px;
+      font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', 'Cascadia Code', monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      color: var(--text-primary);
+      white-space: pre;
+      tab-size: 2;
+    }
+
+    /* Empty state */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 12px;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    .empty-state svg {
+      width: 48px;
+      height: 48px;
+      opacity: 0.3;
+    }
+
+    /* Branding */
+    .branding {
+      position: fixed;
+      bottom: 12px;
+      left: 16px;
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 0.04em;
+      user-select: none;
+      z-index: 10;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+    /* Copy toast */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-strong);
+      color: var(--text-primary);
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 12px;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: all 200ms var(--ease);
+      pointer-events: none;
+      z-index: 100;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <div class="toolbar-group">
+      <button class="toolbar-btn active" data-viewport="desktop" onclick="setViewport('desktop')">
+        Desktop
+      </button>
+      <button class="toolbar-btn" data-viewport="tablet" onclick="setViewport('tablet')">
+        Tablet
+      </button>
+      <button class="toolbar-btn" data-viewport="mobile" onclick="setViewport('mobile')">
+        Mobile
+      </button>
+    </div>
+
+    <div class="toolbar-group">
+      <button class="toolbar-btn active" id="lightModeBtn" onclick="setContentMode('light')">
+        Light
+      </button>
+      <button class="toolbar-btn" id="darkModeBtn" onclick="setContentMode('dark')">
+        Dark
+      </button>
+    </div>
+
+    <div class="toolbar-spacer"></div>
+
+    <div class="status">
+      <span class="status-dot" id="statusDot"></span>
+      <span id="statusText">Connecting...</span>
+    </div>
+
+    <button class="toolbar-btn" id="sourceToggleBtn" onclick="toggleSource()">
+      Source
+    </button>
+
+    <button class="toolbar-btn" onclick="copyCode()">
+      Copy Code
+    </button>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="preview-area">
+      <div class="preview-container" id="previewContainer" data-viewport="desktop">
+        <div class="empty-state" id="emptyState">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+          <span>Waiting for component...</span>
+        </div>
+        <iframe class="preview-iframe" id="previewIframe" style="display:none;"></iframe>
+      </div>
+    </div>
+
+    <div class="source-panel" id="sourcePanel">
+      <div class="source-header">
+        <span>Source</span>
+        <button class="source-close" onclick="toggleSource()">&times;</button>
+      </div>
+      <pre class="source-code" id="sourceCode">No code received yet.</pre>
+    </div>
+  </div>
+
+  <div class="branding">SuperDuper</div>
+  <div class="toast" id="toast">Copied to clipboard</div>
+
+  <script>
+    // State
+    let currentCode = '';
+    let currentCompiledJs = '';
+    let currentViewport = 'desktop';
+    let contentDarkMode = false;
+    let sourceVisible = true;
+
+    // Elements
+    const previewContainer = document.getElementById('previewContainer');
+    const previewIframe = document.getElementById('previewIframe');
+    const emptyState = document.getElementById('emptyState');
+    const sourcePanel = document.getElementById('sourcePanel');
+    const sourceCode = document.getElementById('sourceCode');
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+    const toast = document.getElementById('toast');
+
+    // Viewport
+    function setViewport(viewport) {
+      currentViewport = viewport;
+      previewContainer.setAttribute('data-viewport', viewport);
+      document.querySelectorAll('[data-viewport]').forEach(function(btn) {
+        if (btn.classList.contains('toolbar-btn')) {
+          btn.classList.toggle('active', btn.getAttribute('data-viewport') === viewport);
+        }
+      });
+    }
+
+    // Content dark/light mode
+    function setContentMode(mode) {
+      contentDarkMode = mode === 'dark';
+      document.getElementById('lightModeBtn').classList.toggle('active', !contentDarkMode);
+      document.getElementById('darkModeBtn').classList.toggle('active', contentDarkMode);
+      previewContainer.classList.toggle('dark-content', contentDarkMode);
+      if (currentCode) {
+        renderPreview(currentCode, currentCompiledJs);
+      }
+    }
+
+    // Source panel
+    function toggleSource() {
+      sourceVisible = !sourceVisible;
+      sourcePanel.classList.toggle('collapsed', !sourceVisible);
+      document.getElementById('sourceToggleBtn').classList.toggle('active', sourceVisible);
+    }
+
+    // Copy code
+    function copyCode() {
+      if (!currentCode) return;
+      navigator.clipboard.writeText(currentCode).then(function() {
+        toast.classList.add('show');
+        setTimeout(function() { toast.classList.remove('show'); }, 1500);
+      });
+    }
+
+    // Check if code is plain HTML
+    function isPlainHtml(code) {
+      var t = code.trim();
+      return t.startsWith('<!') || (
+        t.startsWith('<') &&
+        t.indexOf('import ') === -1 &&
+        t.indexOf('export ') === -1 &&
+        t.indexOf('useState') === -1 &&
+        t.indexOf('useEffect') === -1 &&
+        t.indexOf('const ') === -1 &&
+        t.indexOf('function ') === -1
+      );
+    }
+
+    // Build error display element safely (no innerHTML with untrusted content)
+    function buildErrorHtml(message) {
+      return '<pre style="padding:16px;color:#ef4444;font-family:monospace;font-size:13px;white-space:pre-wrap;">' +
+        message.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') +
+        '</pre>';
+    }
+
+    // Render preview
+    function renderPreview(code, compiledJs) {
+      emptyState.style.display = 'none';
+      previewIframe.style.display = 'block';
+
+      var bgColour = contentDarkMode ? '#1a1a2e' : '#ffffff';
+      var textColour = contentDarkMode ? '#e2e8f0' : '#1a202c';
+
+      if (isPlainHtml(code)) {
+        // Plain HTML - inject directly
+        previewIframe.srcdoc = '<!DOCTYPE html>' +
+          '<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">' +
+          '<script src="https://cdn.tailwindcss.com"><\/script>' +
+          '<style>body { background: ' + bgColour + '; color: ' + textColour + '; }</style>' +
+          '</head><body>' + code + '</body></html>';
+      } else {
+        // TSX - use compiled JS with require/exports/module shims
+        var escapedJs = JSON.stringify(compiledJs)
+          .replace(/</g, '\\u003c')
+          .replace(/>/g, '\\u003e');
+
+        previewIframe.srcdoc = '<!DOCTYPE html>' +
+          '<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">' +
+          '<script src="https://cdn.tailwindcss.com"><\/script>' +
+          '<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"><\/script>' +
+          '<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"><\/script>' +
+          '<style>body { background: ' + bgColour + '; color: ' + textColour + '; margin: 0; }</style>' +
+          '</head><body><div id="root"></div>' +
+          '<script>' +
+          'try {' +
+          '  var exports = {};' +
+          '  var module = { exports: exports };' +
+          '  function require(name) {' +
+          '    if (name === "react" || name === "React") return React;' +
+          '    if (name === "react-dom" || name === "react-dom/client" || name === "ReactDOM") return ReactDOM;' +
+          '    throw new Error("Cannot require: " + name);' +
+          '  }' +
+          '  var __code = ' + escapedJs + ';' +
+          '  var s = document.createElement("script");' +
+          '  s.textContent = __code;' +
+          '  document.body.appendChild(s);' +
+          '  var Component = module.exports.default || module.exports;' +
+          '  if (typeof Component === "function") {' +
+          '    var root = ReactDOM.createRoot(document.getElementById("root"));' +
+          '    root.render(React.createElement(Component));' +
+          '  } else {' +
+          '    document.getElementById("root").textContent = "No default export found. Export a React component as default.";' +
+          '  }' +
+          '} catch(e) {' +
+          '  document.getElementById("root").textContent = e.message + "\\n" + (e.stack || "");' +
+          '}' +
+          '<\/script></body></html>';
+      }
+    }
+
+    // Update source panel
+    function updateSourcePanel(code) {
+      sourceCode.textContent = code;
+    }
+
+    // WebSocket connection with auto-reconnect
+    function connect() {
+      var protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      var ws = new WebSocket(protocol + '//' + location.host);
+
+      ws.onopen = function() {
+        statusDot.classList.add('connected');
+        statusText.textContent = 'Connected';
+      };
+
+      ws.onclose = function() {
+        statusDot.classList.remove('connected');
+        statusText.textContent = 'Disconnected';
+        setTimeout(connect, 2000);
+      };
+
+      ws.onerror = function() {
+        ws.close();
+      };
+
+      ws.onmessage = function(event) {
+        try {
+          var data = JSON.parse(event.data);
+          if (data.type === 'update') {
+            currentCode = data.code;
+            currentCompiledJs = data.compiledJs;
+            renderPreview(currentCode, currentCompiledJs);
+            updateSourcePanel(currentCode);
+          }
+        } catch (e) {
+          console.error('Failed to parse WebSocket message:', e);
+        }
+      };
+    }
+
+    connect();
+  </script>
+</body>
+</html>

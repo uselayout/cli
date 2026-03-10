@@ -1,0 +1,12 @@
+{
+  "name": "stripe-lite",
+  "version": "1.0.0",
+  "displayName": "Stripe",
+  "description": "Financial product, light-mode design system inspired by Stripe",
+  "source": "website-extraction",
+  "tier": "free",
+  "tokenCount": 26,
+  "componentCount": 5,
+  "aesthetic": "Light, clean, high-trust",
+  "superduperUrl": "https://superduperui.com/kits/stripe"
+}

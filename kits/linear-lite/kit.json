@@ -1,0 +1,12 @@
+{
+  "name": "linear-lite",
+  "version": "1.0.0",
+  "displayName": "Linear",
+  "description": "Developer tool, dark-first design system inspired by Linear",
+  "source": "website-extraction",
+  "tier": "free",
+  "tokenCount": 24,
+  "componentCount": 5,
+  "aesthetic": "Dark, minimal, developer-focused",
+  "superduperUrl": "https://superduperui.com/kits/linear"
+}
