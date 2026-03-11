@@ -7,6 +7,7 @@ import { serveCommand } from "../src/cli/serve.js";
 import { importCommand } from "../src/cli/import-zip.js";
 import { useCommand } from "../src/cli/use.js";
 import { listCommand } from "../src/cli/list.js";
+import { installCommand } from "../src/cli/install.js";
 
 const require = createRequire(import.meta.url);
 const pkg = require("../../package.json") as { version: string };
@@ -54,6 +55,15 @@ program
   .description("Show all available design kits")
   .action(async () => {
     await listCommand();
+  });
+
+program
+  .command("install")
+  .description("Auto-configure the MCP server for Claude Code, Cursor, or Windsurf")
+  .option("--target <tool>", "Specific tool: claude, cursor, or windsurf")
+  .option("--global", "Install globally (available in all projects, Claude Code only)")
+  .action(async (options: { target?: string; global?: boolean }) => {
+    await installCommand(options);
   });
 
 program.parse();

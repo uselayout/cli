@@ -32,7 +32,7 @@ export async function startServer(): Promise<void> {
 
   // Start the preview server (HTTP + WebSocket on :4321)
   try {
-    const previewServer = await startPreviewServer();
+    const previewServer = await startPreviewServer(undefined, { openBrowser: false });
     console.error(`[superduperui-context] Preview: ${previewServer.url}`);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

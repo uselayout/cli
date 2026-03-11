@@ -17,35 +17,12 @@ Get set up in 60 seconds.
 ```bash
 # Initialise your project with a starter kit
 npx @superduperui/context init --kit linear-lite
+
+# Auto-configure your AI coding agent
+npx @superduperui/context install
 ```
 
-Then add the MCP server to your AI coding agent:
-
-**Claude Code** (`.claude/settings.json`):
-
-```json
-{
-  "mcpServers": {
-    "design-context": {
-      "command": "npx",
-      "args": ["@superduperui/context", "serve"]
-    }
-  }
-}
-```
-
-**Cursor** (`.cursor/mcp.json`):
-
-```json
-{
-  "mcpServers": {
-    "design-context": {
-      "command": "npx",
-      "args": ["@superduperui/context", "serve"]
-    }
-  }
-}
-```
+That's it. The `install` command detects Claude Code, Cursor, and Windsurf automatically and configures the MCP server for the current project.
 
 Your agent now has access to your full design system on every request.
 
@@ -61,7 +38,7 @@ AI coding agents don't know your design system. They produce UI that looks gener
 
 ## MCP Tools
 
-Seven tools are registered with the MCP server automatically.
+Nine tools are registered with the MCP server automatically.
 
 | Tool | Description |
 |------|-------------|
@@ -72,6 +49,8 @@ Seven tools are registered with the MCP server automatically.
 | `check_compliance` | Validates a code snippet against the design system — flags hardcoded colours, bad spacing, unknown tokens, and unrecognised components. |
 | `preview` | Pushes a component to the local live preview canvas at `localhost:4321`. Requires the preview server to be running. |
 | `push_to_figma` | Bridges to the Figma MCP server to create an editable Figma frame from component code. Requires Figma MCP to be configured separately. |
+| `design_in_figma` | Takes a natural language prompt (e.g. "A pricing card with 3 tiers") and returns design tokens, component specs, and step-by-step instructions for calling Figma MCP's `generate_figma_design`. Enables AI agents to design in Figma before writing code. Inputs: `prompt` (required), `fileKey` (optional), `viewports` (optional: desktop/tablet/mobile). |
+| `url_to_figma` | Captures a live website URL as editable Figma frames with auto-layout. Inputs: `url`, `viewports`, `outputMode` (newFile/existingFile/clipboard), `fileKey`. Requires both Figma MCP and Playwright MCP servers. |
 
 ---
 
@@ -82,6 +61,9 @@ Seven tools are registered with the MCP server automatically.
 | `init` | Initialise `.superduper/` in the current directory, optionally with a starter kit. |
 | `init --kit <name>` | Initialise with a specific kit (e.g. `linear-lite`). |
 | `serve` | Start the MCP server. This is what your AI agent connects to. |
+| `install` | Auto-configure MCP settings for Claude Code, Cursor, and Windsurf in one step. |
+| `install --target <tool>` | Target a specific tool: `claude`, `cursor`, or `windsurf`. |
+| `install --global` | Install globally so the MCP server is available in all projects (Claude Code only). |
 | `list` | List all available kits (free and pro). |
 | `use <kit>` | Switch the active kit in an existing `.superduper/` directory. |
 | `import <path>` | Import a design system bundle exported from SuperDuper AI Studio (`.zip`). |
@@ -94,6 +76,15 @@ npx @superduperui/context init --kit linear-lite
 
 # Start with a blank template and write your own DESIGN.md
 npx @superduperui/context init
+
+# Auto-configure MCP settings for all supported editors
+npx @superduperui/context install
+
+# Auto-configure for Claude Code only
+npx @superduperui/context install --target claude
+
+# Install globally (available in all projects — each project uses its own .superduper/)
+npx @superduperui/context install --global
 
 # Switch to a different kit
 npx @superduperui/context use stripe-lite
@@ -135,52 +126,68 @@ Three free starter kits are included. Premium kits are available at [superduperu
 
 ## Setup Guides
 
-### Claude Code
+The easiest way to configure any supported editor is:
 
-Add to `.claude/settings.json` in your project root (or globally at `~/.claude/settings.json`):
+```bash
+npx @superduperui/context install
+```
+
+This auto-detects Claude Code, Cursor, and Windsurf and configures the MCP server. For Claude Code it uses `claude mcp add` (the reliable method); for Cursor and Windsurf it writes the appropriate config file.
+
+### Per-Project vs Global
+
+By default, the MCP server is registered **per-project**. Each project needs its own `install`.
+
+For users working across multiple projects, install globally:
+
+```bash
+npx @superduperui/context install --global
+```
+
+The MCP server always reads `.superduper/` from the current working directory, so each project uses its own design system — even with a global install.
+
+### Manual Setup
+
+If you prefer to configure manually:
+
+**Claude Code** (`.claude/settings.json`):
 
 ```json
 {
   "mcpServers": {
-    "design-context": {
+    "superduper": {
       "command": "npx",
-      "args": ["@superduperui/context", "serve"]
+      "args": ["-y", "@superduperui/context", "serve"]
     }
   }
 }
 ```
 
-### Cursor
-
-Add to `.cursor/mcp.json` in your project root:
+**Cursor** (`.cursor/mcp.json`):
 
 ```json
 {
   "mcpServers": {
-    "design-context": {
+    "superduper": {
       "command": "npx",
-      "args": ["@superduperui/context", "serve"]
+      "args": ["-y", "@superduperui/context", "serve"]
     }
   }
 }
 ```
 
-### Windsurf
-
-Add to `.windsurf/mcp.json` in your project root:
+**Windsurf** (`.windsurf/mcp.json`):
 
 ```json
 {
   "mcpServers": {
-    "design-context": {
+    "superduper": {
       "command": "npx",
-      "args": ["@superduperui/context", "serve"]
+      "args": ["-y", "@superduperui/context", "serve"]
     }
   }
 }
 ```
-
-The MCP server reads from `.superduper/` in the current working directory. Run it from your project root.
 
 ---
 
@@ -208,30 +215,36 @@ When your agent calls the `preview` tool with a component, it appears in the can
 
 ## Figma Integration
 
-The `push_to_figma` tool closes the loop between code and design by bridging to the [Figma MCP server](https://www.figma.com/developers/mcp).
+Three MCP tools bridge the gap between design and code using the [Figma MCP server](https://www.figma.com/developers/mcp): `push_to_figma`, `design_in_figma`, and `url_to_figma`.
 
-### Prerequisites
+### Setup
 
-1. Install the Figma MCP server and add it to your MCP client config alongside `design-context`
-2. Create a Figma personal access token at [figma.com/developers](https://www.figma.com/developers/api#access-tokens)
-3. Configure the Figma MCP server with your token
+Add the Figma MCP server to your agent config alongside `design-context`. It uses OAuth — no API key required:
 
-### The Full Loop
+```bash
+claude mcp add --transport http figma https://mcp.figma.com/mcp
+```
+
+Then authenticate when prompted. The Figma MCP server will open a browser tab for OAuth consent.
+
+### Figma Tools
+
+| Tool | What It Does |
+|------|--------------|
+| `push_to_figma` | Creates an editable Figma frame from component code. Returns a structured prompt for Figma MCP's `generate_figma_design`. |
+| `design_in_figma` | Takes a natural language prompt and returns design tokens, component specs, and step-by-step instructions for `generate_figma_design`. Design in Figma before writing any code. |
+| `url_to_figma` | Captures a live website URL as editable Figma frames with auto-layout. Requires Playwright MCP alongside Figma MCP. |
+
+### The Closed Loop
 
 ```
-Design system in .superduper/
+Developer prompts AI → AI calls get_design_system → generates TSX
         ↓
-Agent calls get_design_system → writes on-brand component
+AI calls preview → renders at localhost:4321
         ↓
-Agent calls preview → visual check at localhost:4321
+AI calls push_to_figma → editable frame in Figma
         ↓
-Agent calls push_to_figma → editable frame created in Figma
-        ↓
-Designer reviews in Figma → leaves comments / adjusts tokens
-        ↓
-Export updated design system from AI Studio → import to .superduper/
-        ↓
-Agent picks up updated tokens automatically
+Designer reviews → AI reads changes via Figma MCP → updates code
 ```
 
 When `push_to_figma` is called, it returns a structured prompt ready to pass to the Figma MCP's `generate_figma_design` tool, including your component code and the relevant design tokens extracted from the active kit.
@@ -333,16 +346,40 @@ This extracts the bundle into `.superduper/` and makes it immediately available 
 
 ## Compliance Checker
 
-The `check_compliance` tool runs four rules against any code snippet:
+The `check_compliance` tool validates a code snippet against your active kit and returns a structured result.
+
+### Rules
 
 | Rule | Severity | What It Catches |
 |------|----------|-----------------|
-| `hardcoded-colours` | Warning | Hex values (`#fff`, `#6366F1`) and `rgb()`/`rgba()` that should use tokens |
-| `hardcoded-spacing` | Info | `margin: 12px` and similar pixel values that should use the spacing scale |
+| `hardcoded-colours` | Error | Hex values (`#fff`, `#6366F1`) and `rgb()`/`rgba()` that should reference tokens |
+| `hardcoded-spacing` | Warning | `margin: 12px` and similar pixel values that should use the spacing scale |
 | `missing-token-reference` | Warning | `var(--unknown-token)` calls not present in `tokens.css` |
 | `unknown-component` | Info | JSX components not listed in the kit's component inventory |
 
-Example agent workflow:
+### Response Shape
+
+```json
+{
+  "passed": false,
+  "issues": [
+    {
+      "rule": "hardcoded-colours",
+      "severity": "error",
+      "line": 4,
+      "message": "Hardcoded colour '#6366F1' — use var(--color-accent) instead"
+    },
+    {
+      "rule": "unknown-component",
+      "severity": "info",
+      "line": 12,
+      "message": "Component 'Tooltip' is not in the active kit's component list"
+    }
+  ]
+}
+```
+
+### Recommended Agent Workflow
 
 ```
 1. get_design_system          — read the spec before writing
