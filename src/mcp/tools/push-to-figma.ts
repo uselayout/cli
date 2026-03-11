@@ -5,12 +5,13 @@ import { PREVIEW_PORT } from "../../kit/types.js";
 export const name = "push-to-figma";
 
 export const description =
-  "Bridges to Figma MCP to push rendered component code as editable Figma frames. " +
-  "The component is rendered live at the preview URL (localhost:4321) which Figma MCP " +
-  "can capture via generate_figma_design. Requires the Figma MCP server to be connected.";
+  "Push a component to Figma as editable frames. Sends the code to the preview server, " +
+  "then returns step-by-step instructions for capturing it via Figma MCP's generate_figma_design. " +
+  "The component renders at localhost:4321/capture — no temp files or HTTP servers needed. " +
+  "Requires the Figma MCP server to be connected.";
 
 export const inputSchema = {
-  code: z.string().describe("The component code to push to Figma as an editable frame"),
+  code: z.string().describe("The component TSX/JSX code to push to Figma as an editable frame"),
   name: z
     .string()
     .optional()
@@ -26,32 +27,49 @@ export function handler(kit: Kit | null) {
     const resolvedName = frameName ?? "SuperDuper Component";
     const resolvedViewports = viewports ?? ["desktop"];
     const captureUrl = `http://localhost:${PREVIEW_PORT}/capture`;
-    const previewUrl = `http://localhost:${PREVIEW_PORT}`;
 
-    // Build token context for Figma rendering
-    let tokenContext = "";
-    if (kit?.tokensCss) {
-      const tokenLines = kit.tokensCss
-        .split("\n")
-        .filter(
-          (line) =>
-            line.includes("--") &&
-            (line.includes("color") ||
-              line.includes("colour") ||
-              line.includes("bg") ||
-              line.includes("text") ||
-              line.includes("border") ||
-              line.includes("radius") ||
-              line.includes("spacing") ||
-              line.includes("font"))
-        )
-        .slice(0, 30);
+    // Step 1: Push code to the preview server so /capture has something to render
+    let pushStatus: string;
+    try {
+      const { WebSocket } = await import("ws");
+      const ws = new WebSocket(`ws://localhost:${PREVIEW_PORT}/ws`);
 
-      if (tokenLines.length > 0) {
-        tokenContext = `\n\nDesign Tokens:\n${tokenLines.join("\n")}`;
-      }
+      pushStatus = await new Promise<string>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          ws.close();
+          reject(new Error("Preview server connection timed out"));
+        }, 5000);
+
+        ws.on("open", () => {
+          ws.send(JSON.stringify({ type: "preview", code, language: "tsx" }));
+          clearTimeout(timeout);
+          ws.close();
+          resolve("Component pushed to preview server");
+        });
+
+        ws.on("error", (err: Error) => {
+          clearTimeout(timeout);
+          reject(err);
+        });
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: [
+              `Could not push to preview server: ${msg}`,
+              "",
+              "The preview server needs to be running. It starts automatically with the MCP server.",
+              "If it failed to start (e.g. port 4321 in use), stop the other process and restart.",
+            ].join("\n"),
+          },
+        ],
+      };
     }
 
+    // Step 2: Build capture instructions for Figma MCP
     const viewportUrls = resolvedViewports.map((vp) => {
       const vpParam = vp === "desktop" ? "" : `?viewport=${vp}`;
       return `- **${vp}:** ${captureUrl}${vpParam}`;
@@ -60,43 +78,31 @@ export function handler(kit: Kit | null) {
     const response = [
       "# Push to Figma",
       "",
-      "The component is rendered live at the preview canvas.",
-      "",
-      "## Auto-Layout",
-      "",
-      "The Figma capture script automatically converts CSS flexbox/grid to Figma auto-layout frames.",
+      `${pushStatus}. The component is now rendering at \`${captureUrl}\`.`,
       "",
       "## Capture URLs",
       "",
-      "Each viewport renders the component at the appropriate width:",
       ...viewportUrls,
       "",
       "## Next Steps",
       "",
-      "For each viewport above, get a separate `captureId` from `generate_figma_design` and capture:",
+      "For each viewport above, call `generate_figma_design` to capture it as a Figma frame:",
       "",
-      `1. Call \`generate_figma_design\` with \`outputMode: "existingFile"\` → get captureId`,
-      `2. Open the capture URL with hash: \`<url>#figmacapture=<captureId>&figmaendpoint=...&figmadelay=5000\``,
-      "3. Poll `generate_figma_design` with `captureId` until completed",
+      "1. Call `generate_figma_design` with `outputMode: \"existingFile\"` or `\"newFile\"` → get a captureId",
+      "2. The instructions will tell you to open a URL — use the **capture URL above** (not a temp file)",
+      `3. Append the capture hash to the URL: \`${captureUrl}#figmacapture=<captureId>&figmaendpoint=...&figmadelay=3000\``,
+      "4. Poll `generate_figma_design` with `captureId` until completed",
       "",
-      `The interactive preview with toolbar is at ${previewUrl}`,
+      "**IMPORTANT:** Do NOT create temp HTML files or start a new HTTP server.",
+      `The component is already rendered and ready to capture at \`${captureUrl}\`.`,
+      "",
+      `**Frame name:** ${resolvedName}`,
       "",
       "## Setup (if Figma MCP is not connected)",
       "",
       "```bash",
       "claude mcp add --transport http figma https://mcp.figma.com/mcp",
       "```",
-      "",
-      "Authentication is via OAuth — no API key needed.",
-      "",
-      "## Component Code",
-      "",
-      "```tsx",
-      code,
-      "```",
-      tokenContext,
-      "",
-      `**Frame name:** ${resolvedName}`,
     ].join("\n");
 
     return {

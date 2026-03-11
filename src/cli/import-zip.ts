@@ -23,8 +23,13 @@ const KNOWN_FILES = [
   "agents.md",
 ] as const;
 
+/** Markers used to find/replace the design system section in root CLAUDE.md */
+const SECTION_START = "<!-- superduper:design-system:start -->";
+const SECTION_END = "<!-- superduper:design-system:end -->";
+
 export async function importCommand(zipPath: string): Promise<void> {
-  const resolvedPath = path.resolve(process.cwd(), zipPath);
+  const cwd = process.cwd();
+  const resolvedPath = path.resolve(cwd, zipPath);
 
   if (!fs.existsSync(resolvedPath)) {
     console.log(chalk.red("Error:"), `File not found: ${resolvedPath}`);
@@ -34,6 +39,24 @@ export async function importCommand(zipPath: string): Promise<void> {
   if (!resolvedPath.endsWith(".zip")) {
     console.log(chalk.red("Error:"), "Expected a .zip file.");
     process.exit(1);
+  }
+
+  // Check we're in a project directory, not somewhere random
+  const projectMarkers = ["package.json", ".git", "CLAUDE.md", "Cargo.toml", "pyproject.toml", "go.mod", "Gemfile"];
+  const isProjectDir = projectMarkers.some((m) => fs.existsSync(path.join(cwd, m)));
+
+  if (!isProjectDir) {
+    console.log(
+      chalk.yellow("Warning:"),
+      "This doesn't look like a project directory."
+    );
+    console.log(
+      chalk.dim(`  Run this from your project root (e.g. where package.json lives).`)
+    );
+    console.log(
+      chalk.dim(`  Current directory: ${cwd}`)
+    );
+    console.log();
   }
 
   // Check that unzip is available
@@ -120,10 +143,56 @@ export async function importCommand(zipPath: string): Promise<void> {
     console.log(`  ${chalk.dim("•")} ${file}`);
   }
 
+  // Merge design system rules into root CLAUDE.md
+  const mergedClaudeMd = mergeIntoRootClaudeMd();
+  if (mergedClaudeMd) {
+    console.log(`  ${chalk.dim("•")} ${mergedClaudeMd}`);
+  }
+
   console.log();
   console.log(
-    `Run ${chalk.cyan("superduperui-context serve")} to start the MCP server.`
+    `Run ${chalk.cyan("npx @superduperui/context install")} to connect the MCP server.`
   );
+}
+
+/**
+ * Merge the .superduper/CLAUDE.md content into the project's root CLAUDE.md.
+ * Uses HTML comment markers so re-imports replace the previous section.
+ * Returns a description string for the import log, or null if nothing was merged.
+ */
+function mergeIntoRootClaudeMd(): string | null {
+  const superduperClaudeMd = path.join(process.cwd(), SUPERDUPER_DIR, "CLAUDE.md");
+  if (!fs.existsSync(superduperClaudeMd)) return null;
+
+  const designSection = fs.readFileSync(superduperClaudeMd, "utf-8").trim();
+  if (!designSection) return null;
+
+  const wrappedSection = `${SECTION_START}\n${designSection}\n${SECTION_END}`;
+  const rootClaudeMd = path.join(process.cwd(), "CLAUDE.md");
+
+  if (fs.existsSync(rootClaudeMd)) {
+    const existing = fs.readFileSync(rootClaudeMd, "utf-8");
+
+    // Replace existing section if present
+    const startIdx = existing.indexOf(SECTION_START);
+    const endIdx = existing.indexOf(SECTION_END);
+
+    if (startIdx !== -1 && endIdx !== -1) {
+      const before = existing.slice(0, startIdx);
+      const after = existing.slice(endIdx + SECTION_END.length);
+      fs.writeFileSync(rootClaudeMd, before + wrappedSection + after);
+      return "CLAUDE.md (updated design system section)";
+    }
+
+    // Append to end
+    const separator = existing.endsWith("\n") ? "\n" : "\n\n";
+    fs.writeFileSync(rootClaudeMd, existing + separator + wrappedSection + "\n");
+    return "CLAUDE.md (appended design system section)";
+  }
+
+  // No root CLAUDE.md — create one
+  fs.writeFileSync(rootClaudeMd, wrappedSection + "\n");
+  return "CLAUDE.md (created with design system section)";
 }
 
 /**

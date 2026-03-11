@@ -340,7 +340,9 @@ Use AI Studio to:
 npx @superduperui/context import ./my-design-export.zip
 ```
 
-This extracts the bundle into `.superduper/` and makes it immediately available to the MCP server.
+This extracts the bundle into `.superduper/` and automatically merges design system rules into your project's root `CLAUDE.md` (using HTML comment markers for idempotent updates). Re-importing replaces the previous section cleanly.
+
+After importing, run `npx @superduperui/context install` to connect the MCP server.
 
 ---
 

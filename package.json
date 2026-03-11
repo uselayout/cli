@@ -1,6 +1,6 @@
 {
   "name": "@superduperui/context",
-  "version": "0.1.0",
+  "version": "0.1.5",
   "description": "Design system context for AI coding agents — MCP server + CLI + live preview",
   "license": "MIT",
   "type": "module",

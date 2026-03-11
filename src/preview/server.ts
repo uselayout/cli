@@ -98,8 +98,11 @@ function buildCaptureHtml(compiledJs: string, viewportWidth?: number): string {
  * for pushing live component updates.
  */
 export function startPreviewServer(
-  port: number = PREVIEW_PORT
+  port: number = PREVIEW_PORT,
+  options: { openBrowser?: boolean } = {}
 ): Promise<PreviewServer> {
+  const { openBrowser = true } = options;
+
   return new Promise((resolve, reject) => {
     const htmlPath = resolveHtmlPath();
     const htmlContent = fs.readFileSync(htmlPath, "utf-8");
@@ -157,10 +160,11 @@ export function startPreviewServer(
     server.listen(port, () => {
       const url = `http://localhost:${port}`;
 
-      // Open browser (fire-and-forget)
-      open(url).catch(() => {
-        // Silently ignore if browser cannot be opened (e.g. SSH session)
-      });
+      if (openBrowser) {
+        open(url).catch(() => {
+          // Silently ignore if browser cannot be opened (e.g. SSH session)
+        });
+      }
 
       resolve({
         url,

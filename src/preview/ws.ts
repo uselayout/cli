@@ -16,6 +16,9 @@ export interface WsBroadcaster {
  */
 export function createWsServer(server: http.Server): WsBroadcaster {
   const wss = new WebSocketServer({ server });
+  wss.on("error", () => {
+    // Handled by the HTTP server's error listener — suppress unhandled crash
+  });
   const clients = new Set<WebSocket>();
   let lastPreview: { code: string; compiledJs: string } | null = null;
 
