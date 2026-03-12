@@ -3,7 +3,8 @@ import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Kit, KitManifest, KitComponent } from "./types.js";
 import {
-  SUPERDUPER_DIR,
+  LAYOUT_DIR,
+  LEGACY_DIR,
   KIT_MANIFEST_FILE,
   DESIGN_MD_FILE,
   TOKENS_CSS_FILE,
@@ -14,13 +15,26 @@ import {
 import { parseDesignMd, parseComponents } from "./parser.js";
 
 /**
- * Load a kit from a .superduper/ directory.
+ * Load a kit from a .layout/ directory.
+ * Falls back to .superduper/ with a deprecation warning if .layout/ is not found.
  * Looks in the current working directory by default.
  */
 export function loadKit(basePath?: string): Kit | null {
-  const dir = resolve(basePath ?? process.cwd(), SUPERDUPER_DIR);
+  const base = resolve(basePath ?? process.cwd());
+  let dir = resolve(base, LAYOUT_DIR);
 
-  if (!existsSync(dir)) return null;
+  if (!existsSync(dir)) {
+    // Fallback: check legacy .superduper/ directory
+    const legacyDir = resolve(base, LEGACY_DIR);
+    if (existsSync(legacyDir)) {
+      process.stderr.write(
+        `[layout-context] Warning: Using legacy .superduper/ directory. Rename it to .layout/ — .superduper/ support will be removed in v1.0.\n`
+      );
+      dir = legacyDir;
+    } else {
+      return null;
+    }
+  }
 
   const manifestPath = join(dir, KIT_MANIFEST_FILE);
   const designMdPath = join(dir, DESIGN_MD_FILE);

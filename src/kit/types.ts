@@ -8,7 +8,7 @@ export interface KitManifest {
   tokenCount: number;
   componentCount: number;
   aesthetic: string;
-  superduperUrl?: string;
+  layoutUrl?: string;
 }
 
 export interface KitSection {
@@ -43,7 +43,8 @@ export interface RegistryEntry {
   aesthetic: string;
 }
 
-export const SUPERDUPER_DIR = ".superduper";
+export const LAYOUT_DIR = ".layout";
+export const LEGACY_DIR = ".superduper"; // Deprecated — remove in v1.0
 export const KIT_MANIFEST_FILE = "kit.json";
 export const DESIGN_MD_FILE = "DESIGN.md";
 export const TOKENS_CSS_FILE = "tokens.css";
@@ -52,4 +53,4 @@ export const TAILWIND_CONFIG_FILE = "tailwind.config.js";
 export const COMPONENTS_DIR = "components";
 
 export const PREVIEW_PORT = 4321;
-export const REGISTRY_URL = "https://superduperui.com/api/kits";
+export const REGISTRY_URL = "https://layout.design/api/kits";

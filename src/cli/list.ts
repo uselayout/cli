@@ -39,13 +39,13 @@ export async function listCommand(): Promise<void> {
   console.log();
   console.log(chalk.dim("Commands:"));
   console.log(
-    `  ${chalk.cyan("superduperui-context init --kit <name>")}  Scaffold with a kit`
+    `  ${chalk.cyan("layout-context init --kit <name>")}  Scaffold with a kit`
   );
   console.log(
-    `  ${chalk.cyan("superduperui-context use <name>")}          Switch to a different kit`
+    `  ${chalk.cyan("layout-context use <name>")}          Switch to a different kit`
   );
   console.log(
-    `  ${chalk.cyan("superduperui-context import <zip>")}        Import an AI Studio export`
+    `  ${chalk.cyan("layout-context import <zip>")}        Import a Layout export`
   );
   console.log();
 }

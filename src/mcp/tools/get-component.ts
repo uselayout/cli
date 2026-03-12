@@ -18,7 +18,7 @@ export function handler(kit: Kit | null) {
         content: [
           {
             type: "text" as const,
-            text: "No design system kit found. Run `npx @superduperui/context init` to set one up.",
+            text: "No design system kit found. Run `npx @layoutdesign/context init` to set one up.",
           },
         ],
       };

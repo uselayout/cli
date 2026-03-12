@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { SUPERDUPER_DIR, TOKENS_CSS_FILE, TOKENS_JSON_FILE, DESIGN_MD_FILE } from "../../kit/types.js";
+import { LAYOUT_DIR, TOKENS_CSS_FILE, TOKENS_JSON_FILE, DESIGN_MD_FILE } from "../../kit/types.js";
 
 export const name = "update-tokens";
 
@@ -32,14 +32,14 @@ interface TokenResult {
 
 export function handler() {
   return async ({ updates }: { updates: Array<{ token: string; value: string }> }) => {
-    const dir = resolve(process.cwd(), SUPERDUPER_DIR);
+    const dir = resolve(process.cwd(), LAYOUT_DIR);
 
     if (!existsSync(dir)) {
       return {
         content: [
           {
             type: "text" as const,
-            text: "No .superduper/ directory found. Run `npx @superduperui/context init` or import a Studio export first.",
+            text: "No .layout/ directory found. Run `npx @layoutdesign/context init` or import a Studio export first.",
           },
         ],
       };
@@ -51,7 +51,7 @@ export function handler() {
         content: [
           {
             type: "text" as const,
-            text: "No tokens.css found in .superduper/. Cannot update tokens without a CSS token file.",
+            text: "No tokens.css found in .layout/. Cannot update tokens without a CSS token file.",
           },
         ],
       };
@@ -80,7 +80,7 @@ export function handler() {
 
     for (const { token, value: newValue } of updates) {
       // Match the token in CSS: --token-name: <value>;
-      const escapedToken = escapeRegex(token);
+      const escapedToken = escapeForRegex(token);
       const pattern = new RegExp(`(${escapedToken}:\\s*)(.+?)(\\s*;)`, "g");
       const match = pattern.exec(css);
 
@@ -109,7 +109,7 @@ export function handler() {
       // Update DESIGN.md
       let mdCount = 0;
       if (designMd && oldValue !== newValue) {
-        const escapedOld = escapeRegex(oldValue);
+        const escapedOld = escapeForRegex(oldValue);
         // For hex colours, ensure we don't match partial (e.g. #5E6AD2 inside #5E6AD2FF)
         const mdPattern = isHexColour(oldValue)
           ? new RegExp(escapedOld + "(?![0-9a-fA-F])", "g")
@@ -193,7 +193,7 @@ function updateJsonToken(
   obj: Record<string, unknown>,
   oldValue: string,
   newValue: string,
-  path: string[] = []
+  pathParts: string[] = []
 ): string | null {
   let foundPath: string | null = null;
 
@@ -204,12 +204,12 @@ function updateJsonToken(
       if ("$value" in record && typeof record["$value"] === "string") {
         if (normalizeValue(record["$value"]) === normalizeValue(oldValue)) {
           record["$value"] = newValue;
-          foundPath = [...path, key].join(".");
+          foundPath = [...pathParts, key].join(".");
         }
       } else if ("$value" in record && Array.isArray(record["$value"])) {
         // fontFamily arrays — skip value matching for arrays
       } else {
-        const result = updateJsonToken(record, oldValue, newValue, [...path, key]);
+        const result = updateJsonToken(record, oldValue, newValue, [...pathParts, key]);
         if (result && !foundPath) foundPath = result;
       }
     }
@@ -218,7 +218,7 @@ function updateJsonToken(
   return foundPath;
 }
 
-function escapeRegex(str: string): string {
+function escapeForRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 

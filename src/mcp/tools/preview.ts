@@ -6,7 +6,7 @@ export const name = "preview";
 
 export const description =
   "Renders a component code snippet in the local live preview canvas. " +
-  "The preview server must be running (`npx @superduperui/context serve`). " +
+  "The preview server must be running (`npx @layoutdesign/context serve`). " +
   "Use this to visually verify a component matches the design system.";
 
 export const inputSchema = {
@@ -64,7 +64,7 @@ export function handler(_kit: Kit | null) {
               `Could not connect to preview server: ${message}`,
               "",
               "Start the preview server first:",
-              "  npx @superduperui/context serve",
+              "  npx @layoutdesign/context serve",
               "",
               `Then the preview will be available at http://localhost:${PREVIEW_PORT}`,
             ].join("\n"),

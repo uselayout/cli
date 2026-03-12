@@ -1,8 +1,8 @@
-# @superduperui/context
+# @layoutdesign/context
 
 **Give your AI agent a design system in one command.**
 
-[![npm version](https://img.shields.io/npm/v/@superduperui/context)](https://www.npmjs.com/package/@superduperui/context)
+[![npm version](https://img.shields.io/npm/v/@layoutdesign/context)](https://www.npmjs.com/package/@layoutdesign/context)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
 [![Node >=18](https://img.shields.io/badge/node-%3E%3D18-blue)](https://nodejs.org)
 
@@ -16,10 +16,10 @@ Get set up in 60 seconds.
 
 ```bash
 # Initialise your project with a starter kit
-npx @superduperui/context init --kit linear-lite
+npx @layoutdesign/context init --kit linear-lite
 
 # Auto-configure your AI coding agent
-npx @superduperui/context install
+npx @layoutdesign/context install
 ```
 
 That's it. The `install` command detects Claude Code, Cursor, and Windsurf automatically and configures the MCP server for the current project.
@@ -32,7 +32,7 @@ Your agent now has access to your full design system on every request.
 
 AI coding agents don't know your design system. They produce UI that looks generic, uses hardcoded colours, ignores your spacing scale, and references components that don't exist.
 
-`@superduperui/context` solves this by exposing your design system — tokens, components, rules — as MCP tools. Your agent calls `get_design_system` before writing UI, `get_tokens` when it needs exact values, and `check_compliance` before it finishes. The result is on-brand code from the first attempt.
+`@layoutdesign/context` solves this by exposing your design system — tokens, components, rules — as MCP tools. Your agent calls `get_design_system` before writing UI, `get_tokens` when it needs exact values, and `check_compliance` before it finishes. The result is on-brand code from the first attempt.
 
 ---
 
@@ -59,49 +59,49 @@ Ten tools are registered with the MCP server automatically.
 
 | Command | Description |
 |---------|-------------|
-| `init` | Initialise `.superduper/` in the current directory, optionally with a starter kit. |
+| `init` | Initialise `.layout/` in the current directory, optionally with a starter kit. |
 | `init --kit <name>` | Initialise with a specific kit (e.g. `linear-lite`). |
 | `serve` | Start the MCP server. This is what your AI agent connects to. |
 | `install` | Auto-configure MCP settings for Claude Code, Cursor, and Windsurf in one step. |
 | `install --target <tool>` | Target a specific tool: `claude`, `cursor`, or `windsurf`. |
 | `install --global` | Install globally so the MCP server is available in all projects (Claude Code only). |
 | `list` | List all available kits (free and pro). |
-| `use <kit>` | Switch the active kit in an existing `.superduper/` directory. |
-| `import <path>` | Import a design system bundle exported from SuperDuper AI Studio (`.zip`). |
+| `use <kit>` | Switch the active kit in an existing `.layout/` directory. |
+| `import <path>` | Import a design system bundle exported from Layout (`.zip`). |
 
 **Examples:**
 
 ```bash
 # Start with the Linear-inspired dark kit
-npx @superduperui/context init --kit linear-lite
+npx @layoutdesign/context init --kit linear-lite
 
 # Start with a blank template and write your own DESIGN.md
-npx @superduperui/context init
+npx @layoutdesign/context init
 
 # Auto-configure MCP settings for all supported editors
-npx @superduperui/context install
+npx @layoutdesign/context install
 
 # Auto-configure for Claude Code only
-npx @superduperui/context install --target claude
+npx @layoutdesign/context install --target claude
 
-# Install globally (available in all projects — each project uses its own .superduper/)
-npx @superduperui/context install --global
+# Install globally (available in all projects — each project uses its own .layout/)
+npx @layoutdesign/context install --global
 
 # Switch to a different kit
-npx @superduperui/context use stripe-lite
+npx @layoutdesign/context use stripe-lite
 
 # See all available kits
-npx @superduperui/context list
+npx @layoutdesign/context list
 
-# Import a bundle from AI Studio
-npx @superduperui/context import ./my-design-export.zip
+# Import a bundle from Layout
+npx @layoutdesign/context import ./my-design-export.zip
 ```
 
 ---
 
 ## Available Kits
 
-Three free starter kits are included. Premium kits are available at [superduperui.com/kits](https://superduperui.com/kits).
+Three free starter kits are included. Premium kits are available at [layout.design/kits](https://layout.design/kits).
 
 ### Free
 
@@ -130,7 +130,7 @@ Three free starter kits are included. Premium kits are available at [superduperu
 The easiest way to configure any supported editor is:
 
 ```bash
-npx @superduperui/context install
+npx @layoutdesign/context install
 ```
 
 This auto-detects Claude Code, Cursor, and Windsurf and configures the MCP server. For Claude Code it uses `claude mcp add` (the reliable method); for Cursor and Windsurf it writes the appropriate config file.
@@ -142,10 +142,10 @@ By default, the MCP server is registered **per-project**. Each project needs its
 For users working across multiple projects, install globally:
 
 ```bash
-npx @superduperui/context install --global
+npx @layoutdesign/context install --global
 ```
 
-The MCP server always reads `.superduper/` from the current working directory, so each project uses its own design system — even with a global install.
+The MCP server always reads `.layout/` from the current working directory, so each project uses its own design system — even with a global install.
 
 ### Manual Setup
 
@@ -156,9 +156,9 @@ If you prefer to configure manually:
 ```json
 {
   "mcpServers": {
-    "superduper": {
+    "layout": {
       "command": "npx",
-      "args": ["-y", "@superduperui/context", "serve"]
+      "args": ["-y", "@layoutdesign/context", "serve"]
     }
   }
 }
@@ -169,9 +169,9 @@ If you prefer to configure manually:
 ```json
 {
   "mcpServers": {
-    "superduper": {
+    "layout": {
       "command": "npx",
-      "args": ["-y", "@superduperui/context", "serve"]
+      "args": ["-y", "@layoutdesign/context", "serve"]
     }
   }
 }
@@ -182,9 +182,9 @@ If you prefer to configure manually:
 ```json
 {
   "mcpServers": {
-    "superduper": {
+    "layout": {
       "command": "npx",
-      "args": ["-y", "@superduperui/context", "serve"]
+      "args": ["-y", "@layoutdesign/context", "serve"]
     }
   }
 }
@@ -199,7 +199,7 @@ The `preview` MCP tool and the preview canvas work together to give you visual v
 Start the preview server alongside the MCP server:
 
 ```bash
-npx @superduperui/context serve
+npx @layoutdesign/context serve
 ```
 
 The preview canvas opens at `http://localhost:4321`. It features:
@@ -256,13 +256,13 @@ When `push_to_figma` is called, it returns a structured prompt ready to pass to 
 
 You don't need a pre-built kit. You can write your own `DESIGN.md` and the MCP server will use it.
 
-**1. Create the `.superduper/` directory:**
+**1. Create the `.layout/` directory:**
 
 ```bash
-npx @superduperui/context init
+npx @layoutdesign/context init
 ```
 
-This creates a blank template at `.superduper/DESIGN.md` for you to fill in.
+This creates a blank template at `.layout/DESIGN.md` for you to fill in.
 
 **2. Edit `DESIGN.md` with your design system:**
 
@@ -291,7 +291,7 @@ Primary action button. Uses --color-primary as background.
 **3. Optionally add token files:**
 
 ```
-.superduper/
+.layout/
 ├── kit.json          # Metadata (name, version, description)
 ├── DESIGN.md         # Human-readable design system spec
 ├── tokens.css        # CSS custom properties
@@ -302,17 +302,17 @@ Primary action button. Uses --color-primary as background.
 **4. Start the MCP server:**
 
 ```bash
-npx @superduperui/context serve
+npx @layoutdesign/context serve
 ```
 
-The server reads whatever is in `.superduper/` — no configuration needed.
+The server reads whatever is in `.layout/` — no configuration needed.
 
 ---
 
 ## On-Disk Structure
 
 ```
-.superduper/
+.layout/
 ├── kit.json            # Kit metadata (name, version, tier, component count)
 ├── DESIGN.md           # Full design system spec — this is what agents read
 ├── tokens.css          # CSS custom properties for all tokens
@@ -324,26 +324,26 @@ All files are plain text and checked into version control. Your whole team gets 
 
 ---
 
-## AI Studio Integration
+## Layout Integration
 
-[SuperDuper AI Studio](https://studio.superduperui.com) extracts design systems from Figma files and live websites, then exports them as a `.zip` bundle ready for import.
+[Layout](https://layout.design) extracts design systems from Figma files and live websites, then exports them as a `.zip` bundle ready for import.
 
-Use AI Studio to:
+Use Layout to:
 
 - Extract tokens and components from an existing Figma file
 - Scrape a live website's design system (colours, typography, spacing, components)
 - Generate a structured `DESIGN.md` using Claude
 - Export a bundle containing `DESIGN.md`, `tokens.css`, `tokens.json`, and `tailwind.config.js`
 
-### Importing an AI Studio Export
+### Importing a Layout Export
 
 ```bash
-npx @superduperui/context import ./my-design-export.zip
+npx @layoutdesign/context import ./my-design-export.zip
 ```
 
-This extracts the bundle into `.superduper/` and automatically merges design system rules into your project's root `CLAUDE.md` (using HTML comment markers for idempotent updates). Re-importing replaces the previous section cleanly.
+This extracts the bundle into `.layout/` and automatically merges design system rules into your project's root `CLAUDE.md` (using HTML comment markers for idempotent updates). Re-importing replaces the previous section cleanly.
 
-After importing, run `npx @superduperui/context install` to connect the MCP server.
+After importing, run `npx @layoutdesign/context install` to connect the MCP server.
 
 ---
 
@@ -399,7 +399,7 @@ The `check_compliance` tool validates a code snippet against your active kit and
 PRs are welcome. The project is MIT licensed.
 
 ```bash
-git clone https://github.com/superduperui/context.git
+git clone https://github.com/uselayout/layout-context.git
 cd context
 npm install
 npm run build
@@ -421,4 +421,4 @@ MIT — see [LICENSE](./LICENSE).
 
 ---
 
-Powered by [SuperDuper](https://superduperui.com).
+Powered by [Layout](https://layout.design).

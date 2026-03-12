@@ -15,7 +15,7 @@ const pkg = require("../../package.json") as { version: string };
 const program = new Command();
 
 program
-  .name("superduperui-context")
+  .name("layout-context")
   .description(
     "Design system context for AI coding agents — MCP server + CLI"
   )
@@ -23,7 +23,7 @@ program
 
 program
   .command("init")
-  .description("Scaffold a .superduper/ directory in the current project")
+  .description("Scaffold a .layout/ directory in the current project")
   .option("--kit <name>", "Start with a specific design kit")
   .action(async (options: { kit?: string }) => {
     await initCommand(options);
@@ -38,7 +38,7 @@ program
 
 program
   .command("import <zip-path>")
-  .description("Import an AI Studio export ZIP into .superduper/")
+  .description("Import a Layout export ZIP into .layout/")
   .action(async (zipPath: string) => {
     await importCommand(zipPath);
   });

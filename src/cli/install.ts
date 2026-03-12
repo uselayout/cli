@@ -5,7 +5,7 @@ import chalk from "chalk";
 
 const MCP_CONFIG = {
   command: "npx",
-  args: ["-y", "@superduperui/context", "serve"],
+  args: ["-y", "@layoutdesign/context", "serve"],
 };
 
 interface McpConfig {
@@ -19,17 +19,17 @@ const TARGET_INFO: Record<Target, { label: string; configPath: string; serverKey
   claude: {
     label: "Claude Code",
     configPath: ".claude/settings.json",
-    serverKey: "superduper",
+    serverKey: "layout",
   },
   cursor: {
     label: "Cursor",
     configPath: ".cursor/mcp.json",
-    serverKey: "superduper",
+    serverKey: "layout",
   },
   windsurf: {
     label: "Windsurf",
     configPath: ".windsurf/mcp.json",
-    serverKey: "superduper",
+    serverKey: "layout",
   },
 };
 
@@ -78,7 +78,7 @@ function addClaudeMcpServer(global: boolean): boolean {
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "pipe"],
     });
-    if (list.includes("superduper")) {
+    if (list.includes("layout")) {
       console.log(
         chalk.dim("  ↳"),
         "Claude Code: already configured"
@@ -94,7 +94,7 @@ function addClaudeMcpServer(global: boolean): boolean {
     if (global) {
       args.push("--scope", "user");
     }
-    args.push("superduper", "--", "npx", "-y", "@superduperui/context", "serve");
+    args.push("layout", "--", "npx", "-y", "@layoutdesign/context", "serve");
 
     execFileSync("claude", args, { stdio: ["pipe", "pipe", "pipe"] });
 
@@ -166,7 +166,7 @@ export async function installCommand(options: {
   global?: boolean;
 }): Promise<void> {
   console.log();
-  console.log(chalk.bold("SuperDuper — Installing MCP server"));
+  console.log(chalk.bold("Layout — Installing MCP server"));
   if (options.global) {
     console.log(chalk.dim("  Scope: global (available in all projects)"));
   } else {
@@ -174,15 +174,15 @@ export async function installCommand(options: {
   }
   console.log();
 
-  // Check .superduper/ exists
-  const hasSuperduper = fs.existsSync(
-    path.join(process.cwd(), ".superduper")
+  // Check .layout/ exists
+  const hasLayout = fs.existsSync(
+    path.join(process.cwd(), ".layout")
   );
-  if (!hasSuperduper) {
+  if (!hasLayout) {
     console.log(
       chalk.yellow("Note:"),
-      "No .superduper/ directory found. Run",
-      chalk.cyan("npx @superduperui/context init"),
+      "No .layout/ directory found. Run",
+      chalk.cyan("npx @layoutdesign/context init"),
       "first, or import a Studio export ZIP."
     );
     console.log();

@@ -15,7 +15,7 @@ export const inputSchema = {
   name: z
     .string()
     .optional()
-    .describe("Optional frame name in Figma (defaults to 'SuperDuper Component')"),
+    .describe("Optional frame name in Figma (defaults to 'Layout Component')"),
   viewports: z
     .array(z.enum(["desktop", "tablet", "mobile"]))
     .optional()
@@ -24,7 +24,7 @@ export const inputSchema = {
 
 export function handler(kit: Kit | null) {
   return async ({ code, name: frameName, viewports }: { code: string; name?: string; viewports?: string[] }) => {
-    const resolvedName = frameName ?? "SuperDuper Component";
+    const resolvedName = frameName ?? "Layout Component";
     const resolvedViewports = viewports ?? ["desktop"];
     const captureUrl = `http://localhost:${PREVIEW_PORT}/capture`;
 

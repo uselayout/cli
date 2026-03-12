@@ -3,10 +3,10 @@ import path from "node:path";
 import chalk from "chalk";
 import { getBundledKitPath, listBundledKits } from "../kit/loader.js";
 import { findKitInRegistry, getRegistry } from "../kit/registry.js";
-import { SUPERDUPER_DIR } from "../kit/types.js";
+import { LAYOUT_DIR } from "../kit/types.js";
 
 export async function useCommand(kitName: string): Promise<void> {
-  const targetDir = path.join(process.cwd(), SUPERDUPER_DIR);
+  const targetDir = path.join(process.cwd(), LAYOUT_DIR);
 
   // Check bundled kits first
   const bundledPath = getBundledKitPath(kitName);
@@ -15,11 +15,11 @@ export async function useCommand(kitName: string): Promise<void> {
     fs.cpSync(bundledPath, targetDir, { recursive: true });
     console.log(
       chalk.green("✓"),
-      `Installed the ${chalk.bold(kitName)} kit into .superduper/`
+      `Installed the ${chalk.bold(kitName)} kit into .layout/`
     );
     console.log();
     console.log(
-      `Run ${chalk.cyan("superduperui-context serve")} to start the MCP server.`
+      `Run ${chalk.cyan("layout-context serve")} to start the MCP server.`
     );
     return;
   }
@@ -35,10 +35,10 @@ export async function useCommand(kitName: string): Promise<void> {
       );
       console.log();
       console.log(
-        `  Purchase at ${chalk.cyan("https://superduperui.com/kits/" + kitName)}`
+        `  Purchase at ${chalk.cyan("https://layout.design/kits/" + kitName)}`
       );
       console.log(
-        `  Then import with: ${chalk.cyan(`superduperui-context import <path-to-zip>`)}`
+        `  Then import with: ${chalk.cyan(`layout-context import <path-to-zip>`)}`
       );
       return;
     }
@@ -78,6 +78,6 @@ export async function useCommand(kitName: string): Promise<void> {
   }
 
   console.log(
-    `Run ${chalk.cyan("superduperui-context list")} for full details.`
+    `Run ${chalk.cyan("layout-context list")} for full details.`
   );
 }

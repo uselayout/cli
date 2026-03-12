@@ -4,7 +4,7 @@ import os from "node:os";
 import { execFileSync } from "node:child_process";
 import chalk from "chalk";
 import {
-  SUPERDUPER_DIR,
+  LAYOUT_DIR,
   KIT_MANIFEST_FILE,
   DESIGN_MD_FILE,
   TOKENS_CSS_FILE,
@@ -12,7 +12,7 @@ import {
   TAILWIND_CONFIG_FILE,
 } from "../kit/types.js";
 
-/** Files we look for in the extracted ZIP and copy to .superduper/ */
+/** Files we look for in the extracted ZIP and copy to .layout/ */
 const KNOWN_FILES = [
   KIT_MANIFEST_FILE,
   DESIGN_MD_FILE,
@@ -24,8 +24,8 @@ const KNOWN_FILES = [
 ] as const;
 
 /** Markers used to find/replace the design system section in root CLAUDE.md */
-const SECTION_START = "<!-- superduper:design-system:start -->";
-const SECTION_END = "<!-- superduper:design-system:end -->";
+const SECTION_START = "<!-- layout:design-system:start -->";
+const SECTION_END = "<!-- layout:design-system:end -->";
 
 export async function importCommand(zipPath: string): Promise<void> {
   const cwd = process.cwd();
@@ -74,7 +74,7 @@ export async function importCommand(zipPath: string): Promise<void> {
   }
 
   // Extract to a temp directory
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "superduperui-import-"));
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "layout-import-"));
 
   try {
     execFileSync("unzip", ["-o", "-q", resolvedPath, "-d", tmpDir], {
@@ -87,9 +87,9 @@ export async function importCommand(zipPath: string): Promise<void> {
   }
 
   // Find the root of the extracted content.
-  // AI Studio ZIPs may have files at root or nested in a single directory.
+  // Layout ZIPs may have files at root or nested in a single directory.
   const extractedRoot = findExtractedRoot(tmpDir);
-  const targetDir = path.join(process.cwd(), SUPERDUPER_DIR);
+  const targetDir = path.join(process.cwd(), LAYOUT_DIR);
 
   fs.mkdirSync(targetDir, { recursive: true });
 
@@ -135,7 +135,7 @@ export async function importCommand(zipPath: string): Promise<void> {
 
   console.log(
     chalk.green("✓"),
-    `Imported ${imported.length} item${imported.length === 1 ? "" : "s"} into .superduper/:`
+    `Imported ${imported.length} item${imported.length === 1 ? "" : "s"} into .layout/:`
   );
   console.log();
 
@@ -151,20 +151,20 @@ export async function importCommand(zipPath: string): Promise<void> {
 
   console.log();
   console.log(
-    `Run ${chalk.cyan("npx @superduperui/context install")} to connect the MCP server.`
+    `Run ${chalk.cyan("npx @layoutdesign/context install")} to connect the MCP server.`
   );
 }
 
 /**
- * Merge the .superduper/CLAUDE.md content into the project's root CLAUDE.md.
+ * Merge the .layout/CLAUDE.md content into the project's root CLAUDE.md.
  * Uses HTML comment markers so re-imports replace the previous section.
  * Returns a description string for the import log, or null if nothing was merged.
  */
 function mergeIntoRootClaudeMd(): string | null {
-  const superduperClaudeMd = path.join(process.cwd(), SUPERDUPER_DIR, "CLAUDE.md");
-  if (!fs.existsSync(superduperClaudeMd)) return null;
+  const layoutClaudeMd = path.join(process.cwd(), LAYOUT_DIR, "CLAUDE.md");
+  if (!fs.existsSync(layoutClaudeMd)) return null;
 
-  const designSection = fs.readFileSync(superduperClaudeMd, "utf-8").trim();
+  const designSection = fs.readFileSync(layoutClaudeMd, "utf-8").trim();
   if (!designSection) return null;
 
   const wrappedSection = `${SECTION_START}\n${designSection}\n${SECTION_END}`;

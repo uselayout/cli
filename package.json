@@ -1,11 +1,11 @@
 {
-  "name": "@superduperui/context",
-  "version": "0.1.6",
+  "name": "@layoutdesign/context",
+  "version": "0.1.7",
   "description": "Design system context for AI coding agents — MCP server + CLI + live preview",
   "license": "MIT",
   "type": "module",
   "bin": {
-    "superduperui-context": "./dist/bin/cli.js"
+    "layout-context": "./dist/bin/cli.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -42,9 +42,9 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/superduperui/context"
+    "url": "https://github.com/uselayout/layout-context"
   },
-  "homepage": "https://superduperui.com/ai-studio",
+  "homepage": "https://layout.design",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
     "commander": "^13.1.0",

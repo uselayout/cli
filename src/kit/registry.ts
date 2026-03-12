@@ -2,7 +2,7 @@ import type { RegistryEntry } from "./types.js";
 
 /**
  * Local registry of available kits.
- * In Phase 2, this will fetch from superduperui.com/api/kits.
+ * In Phase 2, this will fetch from layout.design/api/kits.
  */
 const REGISTRY: RegistryEntry[] = [
   {

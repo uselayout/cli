@@ -15,9 +15,10 @@ import * as pushToFigma from "./tools/push-to-figma.js";
 import * as urlToFigma from "./tools/url-to-figma.js";
 import * as designInFigma from "./tools/design-in-figma.js";
 import * as updateTokens from "./tools/update-tokens.js";
+import * as getScreenshots from "./tools/get-screenshots.js";
 
 /**
- * Start the SuperDuper UI Context MCP server.
+ * Start the Layout Context MCP server.
  * Loads the kit from the current working directory and registers all tools.
  */
 export async function startServer(): Promise<void> {
@@ -28,24 +29,24 @@ export async function startServer(): Promise<void> {
 
   // Log to stderr so it doesn't interfere with stdio transport
   console.error(
-    `[superduperui-context] Kit: ${kitName} (${componentCount} components)`
+    `[layout-context] Kit: ${kitName} (${componentCount} components)`
   );
 
   // Start the preview server (HTTP + WebSocket on :4321)
   try {
     const previewServer = await startPreviewServer(undefined, { openBrowser: false });
-    console.error(`[superduperui-context] Preview: ${previewServer.url}`);
+    console.error(`[layout-context] Preview: ${previewServer.url}`);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`[superduperui-context] Preview server skipped: ${msg}`);
+    console.error(`[layout-context] Preview server skipped: ${msg}`);
   }
 
   const server = new McpServer({
-    name: "superduperui-context",
+    name: "layout-context",
     version: "0.1.0",
   });
 
-  // Register all 10 tools
+  // Register all 11 tools
   server.tool(
     getDesignSystem.name,
     getDesignSystem.description,
@@ -114,6 +115,13 @@ export async function startServer(): Promise<void> {
     updateTokens.description,
     updateTokens.inputSchema,
     updateTokens.handler()
+  );
+
+  server.tool(
+    getScreenshots.name,
+    getScreenshots.description,
+    getScreenshots.inputSchema,
+    getScreenshots.handler()
   );
 
   // Connect via stdio
