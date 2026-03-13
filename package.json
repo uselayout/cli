@@ -1,11 +1,12 @@
 {
   "name": "@layoutdesign/context",
-  "version": "0.1.7",
+  "version": "0.1.10",
   "description": "Design system context for AI coding agents — MCP server + CLI + live preview",
   "license": "MIT",
   "type": "module",
   "bin": {
-    "layout-context": "./dist/bin/cli.js"
+    "layout-context": "./dist/bin/cli.js",
+    "layoutdesign-context": "./dist/bin/cli.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
