@@ -54,6 +54,9 @@ export function createWsServer(server: http.Server): WsBroadcaster {
 
           // Broadcast to all OTHER clients (the preview page)
           broadcast(msg.code, compiledJs);
+
+          // Acknowledge so the sender knows the preview is ready
+          ws.send(JSON.stringify({ type: "ack" }));
         }
       } catch {
         // Ignore malformed messages
