@@ -161,12 +161,78 @@ function addMcpServerViaFile(target: Target): boolean {
   return true;
 }
 
+/**
+ * Add Figma MCP server via `claude mcp add`.
+ * Uses --scope user so it's available across all projects.
+ */
+function addFigmaMcpServer(): boolean {
+  try {
+    const list = execFileSync("claude", ["mcp", "list"], {
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    if (list.toLowerCase().includes("figma")) {
+      console.log(chalk.dim("  ↳"), "Figma MCP: already configured");
+      return false;
+    }
+  } catch {
+    // claude CLI not available
+    return false;
+  }
+
+  try {
+    execFileSync("claude", [
+      "mcp", "add", "--scope", "user", "--transport", "http",
+      "figma", "https://mcp.figma.com/mcp",
+    ], { stdio: ["pipe", "pipe", "pipe"] });
+    console.log(chalk.green("  ✓"), "Figma MCP: registered globally (OAuth — no API key needed)");
+    return true;
+  } catch {
+    console.log(chalk.yellow("  ⚠"), "Figma MCP: could not register automatically");
+    console.log(chalk.dim("    Run manually:"), chalk.cyan("claude mcp add --transport http figma https://mcp.figma.com/mcp"));
+    return false;
+  }
+}
+
+/**
+ * Add Playwright MCP server via `claude mcp add`.
+ * Uses --scope user so it's available across all projects.
+ */
+function addPlaywrightMcpServer(): boolean {
+  try {
+    const list = execFileSync("claude", ["mcp", "list"], {
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    if (list.toLowerCase().includes("playwright")) {
+      console.log(chalk.dim("  ↳"), "Playwright MCP: already configured");
+      return false;
+    }
+  } catch {
+    return false;
+  }
+
+  try {
+    execFileSync("claude", [
+      "mcp", "add", "--scope", "user",
+      "playwright", "--", "npx", "-y", "@anthropic-ai/mcp-playwright",
+    ], { stdio: ["pipe", "pipe", "pipe"] });
+    console.log(chalk.green("  ✓"), "Playwright MCP: registered globally");
+    return true;
+  } catch {
+    console.log(chalk.yellow("  ⚠"), "Playwright MCP: could not register automatically");
+    console.log(chalk.dim("    Run manually:"), chalk.cyan("npx @anthropic-ai/mcp-playwright install"));
+    return false;
+  }
+}
+
 export async function installCommand(options: {
   target?: string;
   global?: boolean;
+  skipFigma?: boolean;
 }): Promise<void> {
   console.log();
-  console.log(chalk.bold("Layout — Installing MCP server"));
+  console.log(chalk.bold("Layout — Installing MCP servers"));
   if (options.global) {
     console.log(chalk.dim("  Scope: global (available in all projects)"));
   } else {
@@ -215,7 +281,9 @@ export async function installCommand(options: {
     }
   }
 
+  // --- 1. Install Layout MCP server ---
   console.log();
+  console.log(chalk.bold("  Layout MCP"));
 
   let installed = 0;
   for (const target of targets) {
@@ -226,26 +294,28 @@ export async function installCommand(options: {
     }
   }
 
-  console.log();
+  // --- 2. Install Figma + Playwright MCP (Claude Code only, unless --skip-figma) ---
+  const hasClaude = targets.includes("claude");
+  if (hasClaude && !options.skipFigma) {
+    console.log();
+    console.log(chalk.bold("  Figma integration"));
+    addFigmaMcpServer();
+    addPlaywrightMcpServer();
+  }
 
-  if (installed > 0) {
-    console.log(chalk.green("Done!"), "Your AI agent now has access to your design system.");
+  // --- 3. Summary ---
+  console.log();
+  console.log(chalk.green("Done!"), "Your AI agent now has access to your design system.");
+  console.log();
+  console.log(chalk.yellow("→"), "Restart your AI coding tool to activate the MCP servers.");
+  console.log();
+  console.log(chalk.dim("  When building UI, your agent will automatically use your"));
+  console.log(chalk.dim("  design tokens, components, and brand rules to stay on-brand."));
+
+  if (hasClaude && options.skipFigma) {
     console.log();
-    console.log(chalk.yellow("→"), "Restart your AI coding tool to activate the MCP server.");
-    console.log();
-    console.log(chalk.dim("  When building UI, your agent will automatically use your"));
-    console.log(chalk.dim("  design tokens, components, and brand rules to stay on-brand."));
-    console.log();
-    console.log(chalk.bold("Optional: Enable Figma integration"));
-    console.log();
-    console.log(chalk.dim("  For push-to-Figma and URL-to-Figma features, connect these MCP servers:"));
-    console.log();
-    console.log(`  ${chalk.cyan("claude mcp add --transport http figma https://mcp.figma.com/mcp")}`);
-    console.log(chalk.dim("    Push components and designs to Figma (OAuth — no API key needed)"));
-    console.log();
-    console.log(chalk.dim("  Playwright MCP is also needed for URL-to-Figma capture."));
-  } else {
-    console.log(chalk.dim("  Nothing to do — all targets already configured."));
+    console.log(chalk.dim("  Figma integration skipped. To enable later:"));
+    console.log(chalk.dim("    npx @layoutdesign/context install"));
   }
 
   console.log();

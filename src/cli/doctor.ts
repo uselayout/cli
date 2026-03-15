@@ -6,15 +6,22 @@ interface CheckResult {
   ok: boolean;
   detail: string;
   fix?: string;
+  fixCmd?: string[];
   requiredBy?: string;
 }
 
 /**
  * `layout-context doctor` — checks Node.js, Claude CLI, and MCP dependencies.
+ * With --fix, automatically installs missing MCP servers.
  */
-export async function doctorCommand(): Promise<void> {
+export async function doctorCommand(options?: { fix?: boolean }): Promise<void> {
+  const autoFix = options?.fix ?? false;
+
   console.log();
   console.log(chalk.bold("Layout Context — Dependency Check"));
+  if (autoFix) {
+    console.log(chalk.dim("  Mode: auto-fix enabled"));
+  }
   console.log();
 
   const results: CheckResult[] = [
@@ -24,6 +31,7 @@ export async function doctorCommand(): Promise<void> {
   ];
 
   let issues = 0;
+  let fixed = 0;
   for (const r of results) {
     if (r.ok) {
       console.log(chalk.green("  ✅ ") + r.label + chalk.dim(` — ${r.detail}`));
@@ -31,9 +39,26 @@ export async function doctorCommand(): Promise<void> {
       issues++;
       console.log(chalk.yellow("  ⚠️  ") + r.label);
       console.log(chalk.dim(`     ${r.detail}`));
-      if (r.fix) {
+
+      // Attempt auto-fix if --fix and we have a fixCmd
+      if (autoFix && r.fixCmd) {
+        try {
+          execFileSync(r.fixCmd[0]!, r.fixCmd.slice(1), {
+            stdio: ["pipe", "pipe", "pipe"],
+          });
+          console.log(chalk.green(`     ✓ Fixed!`));
+          fixed++;
+          issues--;
+        } catch {
+          console.log(chalk.red(`     ✗ Auto-fix failed`));
+          if (r.fix) {
+            console.log(chalk.cyan(`     Run manually: ${r.fix}`));
+          }
+        }
+      } else if (r.fix) {
         console.log(chalk.cyan(`     Fix: ${r.fix}`));
       }
+
       if (r.requiredBy) {
         console.log(chalk.dim(`     Required for: ${r.requiredBy}`));
       }
@@ -41,11 +66,17 @@ export async function doctorCommand(): Promise<void> {
   }
 
   console.log();
-  if (issues === 0) {
+  if (issues === 0 && fixed === 0) {
     console.log(chalk.green("All checks passed. Full functionality available."));
+  } else if (issues === 0 && fixed > 0) {
+    console.log(chalk.green(`All issues fixed (${fixed} auto-fixed). Restart your AI coding tool to activate.`));
+  } else if (autoFix) {
+    console.log(
+      chalk.yellow(`${issues} issue${issues > 1 ? "s" : ""} remaining (${fixed} auto-fixed). Fix warnings above manually.`)
+    );
   } else {
     console.log(
-      chalk.yellow(`${issues} issue${issues > 1 ? "s" : ""} found. Fix warnings above for full functionality.`)
+      chalk.yellow(`${issues} issue${issues > 1 ? "s" : ""} found. Run with ${chalk.cyan("--fix")} to auto-install missing MCP servers.`)
     );
   }
   console.log();
@@ -121,7 +152,8 @@ function checkMcpServers(): CheckResult[] {
           label: "Figma MCP",
           ok: false,
           detail: "not found in MCP server list",
-          fix: "claude mcp add --transport http figma https://mcp.figma.com/mcp",
+          fix: "claude mcp add --scope user --transport http figma https://mcp.figma.com/mcp",
+          fixCmd: ["claude", "mcp", "add", "--scope", "user", "--transport", "http", "figma", "https://mcp.figma.com/mcp"],
           requiredBy: "push-to-figma, design-in-figma, url-to-figma",
         }
   );
@@ -139,7 +171,8 @@ function checkMcpServers(): CheckResult[] {
           label: "Playwright MCP",
           ok: false,
           detail: "not found in MCP server list",
-          fix: "npx @anthropic-ai/mcp-playwright install",
+          fix: "claude mcp add --scope user playwright -- npx -y @anthropic-ai/mcp-playwright",
+          fixCmd: ["claude", "mcp", "add", "--scope", "user", "playwright", "--", "npx", "-y", "@anthropic-ai/mcp-playwright"],
           requiredBy: "push-to-figma, url-to-figma",
         }
   );

@@ -60,18 +60,20 @@ program
 
 program
   .command("install")
-  .description("Auto-configure the MCP server for Claude Code, Cursor, or Windsurf")
+  .description("Auto-configure MCP servers (Layout + Figma + Playwright) for Claude Code, Cursor, or Windsurf")
   .option("--target <tool>", "Specific tool: claude, cursor, or windsurf")
   .option("--global", "Install globally (available in all projects, Claude Code only)")
-  .action(async (options: { target?: string; global?: boolean }) => {
+  .option("--skip-figma", "Skip Figma and Playwright MCP setup")
+  .action(async (options: { target?: string; global?: boolean; skipFigma?: boolean }) => {
     await installCommand(options);
   });
 
 program
   .command("doctor")
   .description("Check Node.js version, Claude CLI, and MCP dependencies")
-  .action(async () => {
-    await doctorCommand();
+  .option("--fix", "Auto-install missing MCP servers")
+  .action(async (options: { fix?: boolean }) => {
+    await doctorCommand(options);
   });
 
 program.parse();
