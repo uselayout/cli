@@ -162,34 +162,32 @@ function addMcpServerViaFile(target: Target): boolean {
 }
 
 /**
- * Add Figma MCP server via `claude mcp add`.
- * Uses --scope user so it's available across all projects.
+ * Add Figma MCP server via `claude mcp add --scope user`.
+ *
+ * Important: we do NOT pre-check `claude mcp list`. The plugin
+ * `figma@claude-plugins-official` causes "figma" to appear in that list,
+ * which would make us skip this step — but the plugin-provided registration
+ * uses OAuth that doesn't persist between sessions. We must always ensure a
+ * proper user-scoped entry exists. Let `claude mcp add` itself handle the
+ * "already registered" case.
  */
 function addFigmaMcpServer(): boolean {
-  try {
-    const list = execFileSync("claude", ["mcp", "list"], {
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-    if (list.toLowerCase().includes("figma")) {
-      console.log(chalk.dim("  ↳"), "Figma MCP: already configured");
-      return false;
-    }
-  } catch {
-    // claude CLI not available
-    return false;
-  }
-
   try {
     execFileSync("claude", [
       "mcp", "add", "--scope", "user", "--transport", "http",
       "figma", "https://mcp.figma.com/mcp",
     ], { stdio: ["pipe", "pipe", "pipe"] });
-    console.log(chalk.green("  ✓"), "Figma MCP: registered globally (OAuth — no API key needed)");
+    console.log(chalk.green("  ✓"), "Figma MCP: registered globally (OAuth — authenticate once in Claude Code)");
     return true;
-  } catch {
+  } catch (err) {
+    const stderr = (err as { stderr?: Buffer }).stderr?.toString() ?? "";
+    // Already registered at user scope — this is fine
+    if (stderr.includes("already") || stderr.includes("exists")) {
+      console.log(chalk.dim("  ↳"), "Figma MCP: already configured at user scope");
+      return false;
+    }
     console.log(chalk.yellow("  ⚠"), "Figma MCP: could not register automatically");
-    console.log(chalk.dim("    Run manually:"), chalk.cyan("claude mcp add --transport http figma https://mcp.figma.com/mcp"));
+    console.log(chalk.dim("    Run manually:"), chalk.cyan("claude mcp add --scope user --transport http figma https://mcp.figma.com/mcp"));
     return false;
   }
 }

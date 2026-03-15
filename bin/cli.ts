@@ -9,6 +9,7 @@ import { useCommand } from "../src/cli/use.js";
 import { listCommand } from "../src/cli/list.js";
 import { installCommand } from "../src/cli/install.js";
 import { doctorCommand } from "../src/cli/doctor.js";
+import { serveLocalCommand } from "../src/cli/serve-local.js";
 
 const require = createRequire(import.meta.url);
 const pkg = require("../../package.json") as { version: string };
@@ -66,6 +67,18 @@ program
   .option("--skip-figma", "Skip Figma and Playwright MCP setup")
   .action(async (options: { target?: string; global?: boolean; skipFigma?: boolean }) => {
     await installCommand(options);
+  });
+
+program
+  .command("serve-local <path>")
+  .description("Serve a local file or directory over HTTP for use with url-to-figma (file:// URLs are not supported by Figma)")
+  .option("--port <n>", "Port to use (default: auto-detect from 8765)")
+  .option("--quiet", "Print only the URL (useful for scripting)")
+  .action(async (targetPath: string, options: { port?: string; quiet?: boolean }) => {
+    await serveLocalCommand(targetPath, {
+      port: options.port ? parseInt(options.port, 10) : undefined,
+      quiet: options.quiet,
+    });
   });
 
 program
