@@ -65,7 +65,9 @@ Eleven tools are registered with the MCP server automatically.
 | `install` | Auto-configure MCP settings for Claude Code, Cursor, and Windsurf in one step. |
 | `install --target <tool>` | Target a specific tool: `claude`, `cursor`, or `windsurf`. |
 | `install --global` | Install globally so the MCP server is available in all projects (Claude Code only). |
-| `doctor` | Check Node.js version, Claude CLI, and MCP dependencies (Figma, Playwright). |
+| `doctor` | Check Node.js version, Claude CLI, and MCP dependencies (Figma, Playwright). Use `--fix` to auto-install any missing tools. |
+| `doctor --fix` | Auto-install missing dependencies (Figma MCP, Playwright MCP). |
+| `serve-local <path>` | Serve a local directory over HTTP for use with the `url-to-figma` MCP tool. Requires Python 3. |
 | `list` | List all available kits (free and pro). |
 | `use <kit>` | Switch the active kit in an existing `.layout/` directory. |
 | `import <path>` | Import a design system bundle exported from Layout (`.zip`). |
@@ -96,6 +98,16 @@ npx @layoutdesign/context list
 
 # Import a bundle from Layout
 npx @layoutdesign/context import ./my-design-export.zip
+
+# Check setup and detect issues
+npx @layoutdesign/context doctor
+
+# Auto-install missing dependencies
+npx @layoutdesign/context doctor --fix
+
+# Serve a local directory for url-to-figma (requires Python 3)
+npx @layoutdesign/context serve-local ./path/to/files
+npx @layoutdesign/context serve-local ./path/to/files --port 8080
 ```
 
 ---
@@ -357,6 +369,8 @@ npx @layoutdesign/context import ./my-design-export.zip
 ```
 
 This extracts the bundle into `.layout/` and automatically merges design system rules into your project's root `CLAUDE.md` (using HTML comment markers for idempotent updates). Re-importing replaces the previous section cleanly.
+
+Note: Bundles exported from Layout Studio are typically under 5 MB. Very large ZIPs may take a moment to extract.
 
 After importing, run `npx @layoutdesign/context install` to connect the MCP server.
 
