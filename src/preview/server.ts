@@ -111,18 +111,27 @@ export function startPreviewServer(
 
       // Standalone capture page — renders component without preview chrome.
       // Used by Figma MCP's generate_figma_design to capture the component.
+      // Supports ?variant=Name to capture a specific named variant.
       if (req.method === "GET" && url === "/capture") {
-        const last = getLastPreview();
-        if (!last) {
+        const variantParam = parsedUrl.searchParams.get("variant");
+        const preview = variantParam
+          ? getVariantPreview(variantParam)
+          : getLastPreview();
+
+        if (!preview) {
           res.writeHead(404, { "Content-Type": "text/plain" });
-          res.end("No component previewed yet. Send code via the preview tool first.");
+          res.end(
+            variantParam
+              ? `No preview found for variant "${variantParam}". Send code via the preview tool first.`
+              : "No component previewed yet. Send code via the preview tool first."
+          );
           return;
         }
         res.writeHead(200, {
           "Content-Type": "text/html; charset=utf-8",
           "Cache-Control": "no-cache",
         });
-        res.end(buildCaptureHtml(last.compiledJs));
+        res.end(buildCaptureHtml(preview.compiledJs));
         return;
       }
 
@@ -130,7 +139,7 @@ export function startPreviewServer(
       res.end("Not Found");
     });
 
-    const { broadcast, getLastPreview } = createWsServer(server);
+    const { broadcast, getLastPreview, getVariantPreview } = createWsServer(server);
 
     server.on("error", (err: NodeJS.ErrnoException) => {
       if (err.code === "EADDRINUSE") {

@@ -5,6 +5,7 @@ import { transpileTsx } from "./transpile.js";
 export interface WsBroadcaster {
   broadcast: (code: string, compiledJs: string) => void;
   getLastPreview: () => { code: string; compiledJs: string } | null;
+  getVariantPreview: (name: string) => { code: string; compiledJs: string } | null;
 }
 
 /**
@@ -21,6 +22,7 @@ export function createWsServer(server: http.Server): WsBroadcaster {
   });
   const clients = new Set<WebSocket>();
   let lastPreview: { code: string; compiledJs: string } | null = null;
+  const variantPreviews = new Map<string, { code: string; compiledJs: string }>();
 
   wss.on("connection", (ws) => {
     clients.add(ws);
@@ -31,6 +33,7 @@ export function createWsServer(server: http.Server): WsBroadcaster {
           type?: string;
           code?: string;
           language?: string;
+          variantName?: string;
         };
 
         if (msg.type === "preview" && msg.code) {
@@ -50,6 +53,11 @@ export function createWsServer(server: http.Server): WsBroadcaster {
               return;
             }
             compiledJs = result.js;
+          }
+
+          // Store in variant map if a variantName was provided
+          if (msg.variantName) {
+            variantPreviews.set(msg.variantName, { code: msg.code, compiledJs });
           }
 
           // Broadcast to all OTHER clients (the preview page)
@@ -87,5 +95,9 @@ export function createWsServer(server: http.Server): WsBroadcaster {
     return lastPreview;
   }
 
-  return { broadcast, getLastPreview };
+  function getVariantPreview(variantName: string) {
+    return variantPreviews.get(variantName) ?? null;
+  }
+
+  return { broadcast, getLastPreview, getVariantPreview };
 }
