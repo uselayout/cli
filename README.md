@@ -42,7 +42,7 @@ Eleven tools are registered with the MCP server automatically.
 
 | Tool | Description |
 |------|-------------|
-| `get_design_system` | Returns the full DESIGN.md, or a filtered section (colours, typography, spacing, components). Use this before writing any UI. |
+| `get_design_system` | Returns the full layout.md, or a filtered section (colours, typography, spacing, components). Use this before writing any UI. |
 | `get_tokens` | Returns design tokens in CSS custom properties, W3C DTCG JSON, or Tailwind config format. |
 | `get_component` | Returns the spec and code example for a named component. |
 | `list_components` | Lists all components defined in the active kit. |
@@ -51,7 +51,7 @@ Eleven tools are registered with the MCP server automatically.
 | `push_to_figma` | Bridges to the Figma MCP server to create an editable Figma frame from component code. Requires Figma MCP to be configured separately. |
 | `design_in_figma` | Takes a natural language prompt (e.g. "A pricing card with 3 tiers") and returns design tokens, component specs, and step-by-step instructions for calling Figma MCP's `generate_figma_design`. Enables AI agents to design in Figma before writing code. Inputs: `prompt` (required), `fileKey` (optional), `viewports` (optional: desktop/tablet/mobile). |
 | `url_to_figma` | Captures a live website URL as editable Figma frames with auto-layout. Inputs: `url`, `viewports`, `outputMode` (newFile/existingFile/clipboard), `fileKey`. Requires both Figma MCP and Playwright MCP servers. |
-| `update_tokens` | Updates token values in `tokens.css`, `tokens.json`, and `DESIGN.md` simultaneously. Use when tweaking colours, spacing, or other tokens without re-extracting. Keeps the entire design system consistent. |
+| `update_tokens` | Updates token values in `tokens.css`, `tokens.json`, and `layout.md` simultaneously. Use when tweaking colours, spacing, or other tokens without re-extracting. Keeps the entire design system consistent. |
 
 ---
 
@@ -78,7 +78,7 @@ Eleven tools are registered with the MCP server automatically.
 # Start with the Linear-inspired dark kit
 npx @layoutdesign/context init --kit linear-lite
 
-# Start with a blank template and write your own DESIGN.md
+# Start with a blank template and write your own layout.md
 npx @layoutdesign/context init
 
 # Auto-configure MCP settings for all supported editors
@@ -281,7 +281,7 @@ When `push_to_figma` is called, it returns a structured prompt ready to pass to 
 
 ## Custom Design Systems
 
-You don't need a pre-built kit. You can write your own `DESIGN.md` and the MCP server will use it.
+You don't need a pre-built kit. You can write your own `layout.md` and the MCP server will use it.
 
 **1. Create the `.layout/` directory:**
 
@@ -289,9 +289,9 @@ You don't need a pre-built kit. You can write your own `DESIGN.md` and the MCP s
 npx @layoutdesign/context init
 ```
 
-This creates a blank template at `.layout/DESIGN.md` for you to fill in.
+This creates a blank template at `.layout/layout.md` for you to fill in.
 
-**2. Edit `DESIGN.md` with your design system:**
+**2. Edit `layout.md` with your design system:**
 
 ```markdown
 # My Design System
@@ -320,7 +320,7 @@ Primary action button. Uses --color-primary as background.
 ```
 .layout/
 ├── kit.json          # Metadata (name, version, description)
-├── DESIGN.md         # Human-readable design system spec
+├── layout.md         # Human-readable design system spec
 ├── tokens.css        # CSS custom properties
 ├── tokens.json       # W3C DTCG tokens (optional)
 └── tailwind.config.js  # Tailwind theme extension (optional)
@@ -341,7 +341,7 @@ The server reads whatever is in `.layout/` — no configuration needed.
 ```
 .layout/
 ├── kit.json            # Kit metadata (name, version, tier, component count)
-├── DESIGN.md           # Full design system spec — this is what agents read
+├── layout.md           # Full design system spec — this is what agents read
 ├── tokens.css          # CSS custom properties for all tokens
 ├── tokens.json         # W3C DTCG tokens.json (for tooling integration)
 └── tailwind.config.js  # Tailwind theme config matching the token set
@@ -359,8 +359,8 @@ Use Layout to:
 
 - Extract tokens and components from an existing Figma file
 - Scrape a live website's design system (colours, typography, spacing, components)
-- Generate a structured `DESIGN.md` using Claude
-- Export a bundle containing `DESIGN.md`, `tokens.css`, `tokens.json`, and `tailwind.config.js`
+- Generate a structured `layout.md` using Claude
+- Export a bundle containing `layout.md`, `tokens.css`, `tokens.json`, and `tailwind.config.js`
 
 ### Importing a Layout Export
 

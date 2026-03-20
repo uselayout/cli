@@ -26,7 +26,7 @@ export function handler(kit: Kit | null) {
         content: [
           {
             type: "text" as const,
-            text: "No components defined in this kit. Components are parsed from the ## Components section in DESIGN.md.",
+            text: "No components defined in this kit. Components are parsed from the ## Components section in layout.md.",
           },
         ],
       };

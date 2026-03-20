@@ -99,7 +99,7 @@ export function handler(kit: Kit | null) {
             .join("\n")
         : "No components defined in kit.";
 
-    // Build design rules from DESIGN.md
+    // Build design rules from layout.md
     const designRules = extractDesignRules(kit);
 
     // Viewport dimensions

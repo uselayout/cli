@@ -1,5 +1,5 @@
 export { loadKit, getBundledKitPath, listBundledKits } from "./kit/loader.js";
-export { parseDesignMd, extractQuickReference, parseComponents } from "./kit/parser.js";
+export { parseLayoutMd, extractQuickReference, parseComponents } from "./kit/parser.js";
 export { getRegistry, findKitInRegistry } from "./kit/registry.js";
 export type { Kit, KitManifest, KitSection, KitComponent, RegistryEntry } from "./kit/types.js";
 export { checkCompliance } from "./compliance/checker.js";

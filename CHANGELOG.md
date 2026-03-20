@@ -8,6 +8,15 @@ This project adheres to [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ## [Unreleased]
 
+### Changed
+- Renamed `DESIGN.md` to `layout.md` across the entire codebase — file names, constants, variables, function names, tool descriptions, documentation.
+- `DESIGN_MD_FILE` constant renamed to `LAYOUT_MD_FILE` with value `"layout.md"`.
+- `parseDesignMd()` renamed to `parseLayoutMd()`.
+- Kit interface property `designMd` renamed to `layoutMd`.
+- Kit loader auto-migrates existing `DESIGN.md` files to `layout.md` on load with a console notice.
+- ZIP import (`import` command) accepts `DESIGN.md` from old bundles and writes it as `layout.md`.
+- Bundled kits (`linear-lite`, `stripe-lite`, `notion-lite`) renamed to use `layout.md`.
+
 ---
 
 ## [0.1.14] - 2026-03-15

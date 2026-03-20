@@ -5,7 +5,7 @@ import { extractSection } from "../../kit/parser.js";
 export const name = "get-design-system";
 
 export const description =
-  "Returns the full DESIGN.md content for the active design system, or a specific section. " +
+  "Returns the full layout.md content for the active design system, or a specific section. " +
   "Use this to understand colours, typography, spacing, layout rules, and component specs before writing UI code.";
 
 export const inputSchema = {
@@ -24,7 +24,7 @@ export function handler(kit: Kit | null) {
         content: [
           {
             type: "text" as const,
-            text: "No design system kit found. Run `npx @layoutdesign/context init` in your project root to set one up, or place a DESIGN.md in .layout/.",
+            text: "No design system kit found. Run `npx @layoutdesign/context init` in your project root to set one up, or place a layout.md in .layout/.",
           },
         ],
       };
@@ -54,7 +54,7 @@ export function handler(kit: Kit | null) {
     }
 
     return {
-      content: [{ type: "text" as const, text: kit.designMd }],
+      content: [{ type: "text" as const, text: kit.layoutMd }],
     };
   };
 }

@@ -30,11 +30,11 @@ This guide walks through the complete Layout design system loop:
 4. Review in the Studio:
    - **Tokens tab** — colours, typography, spacing, radius
    - **Screenshots tab** — full-page + viewport reference images
-5. Let DESIGN.md generate (takes ~30 seconds)
+5. Let layout.md generate (takes ~30 seconds)
 6. Click **Export** → select all formats → download ZIP
 
 > **Tip:** The screenshots are visible in the Studio for reference but aren't included in the
-> export. The DESIGN.md contains all the design system context the agent needs.
+> export. The layout.md contains all the design system context the agent needs.
 
 ---
 
@@ -113,7 +113,7 @@ After generating the code, call the preview tool to render it live.
 ```
 
 **What happens:**
-- Agent calls `get_design_system` → receives the full DESIGN.md
+- Agent calls `get_design_system` → receives the full layout.md
 - Agent calls `get_tokens` → receives CSS custom properties
 - Agent calls `list_components` → sees Button, Input, Card, Badge, Avatar
 - Agent generates a full marketing page TSX using Linear's tokens
@@ -209,7 +209,7 @@ Then:
 
 **The loop:**
 ```
-Layout (extract) → DESIGN.md → Agent (generate) → Preview (:4321)
+Layout (extract) → layout.md → Agent (generate) → Preview (:4321)
     → Figma (push) → Designer (edit) → Agent (read back) → Preview (:4321)
 ```
 

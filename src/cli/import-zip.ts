@@ -6,7 +6,7 @@ import chalk from "chalk";
 import {
   LAYOUT_DIR,
   KIT_MANIFEST_FILE,
-  DESIGN_MD_FILE,
+  LAYOUT_MD_FILE,
   TOKENS_CSS_FILE,
   TOKENS_JSON_FILE,
   TAILWIND_CONFIG_FILE,
@@ -15,7 +15,7 @@ import {
 /** Files we look for in the extracted ZIP and copy to .layout/ */
 const KNOWN_FILES = [
   KIT_MANIFEST_FILE,
-  DESIGN_MD_FILE,
+  LAYOUT_MD_FILE,
   TOKENS_CSS_FILE,
   TOKENS_JSON_FILE,
   TAILWIND_CONFIG_FILE,
@@ -103,6 +103,15 @@ export async function importCommand(zipPath: string): Promise<void> {
     }
   }
 
+  // Backward compatibility: accept DESIGN.md from old bundles, write as layout.md
+  if (!imported.includes(LAYOUT_MD_FILE)) {
+    const legacySrc = path.join(extractedRoot, "DESIGN.md");
+    if (fs.existsSync(legacySrc)) {
+      fs.copyFileSync(legacySrc, path.join(targetDir, LAYOUT_MD_FILE));
+      imported.push(LAYOUT_MD_FILE);
+    }
+  }
+
   // Copy components directory if it exists
   const componentsSrc = path.join(extractedRoot, "components");
   if (fs.existsSync(componentsSrc) && fs.statSync(componentsSrc).isDirectory()) {
@@ -156,7 +165,7 @@ export async function importCommand(zipPath: string): Promise<void> {
 }
 
 /**
- * Merge the .layout/CLAUDE.md content into the project's root CLAUDE.md.
+ * Merge the .layout/CLAUDE.md content into the project root CLAUDE.md.
  * Uses HTML comment markers so re-imports replace the previous section.
  * Returns a description string for the import log, or null if nothing was merged.
  */

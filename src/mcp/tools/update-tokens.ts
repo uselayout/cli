@@ -1,13 +1,13 @@
 import { z } from "zod";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { LAYOUT_DIR, TOKENS_CSS_FILE, TOKENS_JSON_FILE, DESIGN_MD_FILE } from "../../kit/types.js";
+import { LAYOUT_DIR, TOKENS_CSS_FILE, TOKENS_JSON_FILE, LAYOUT_MD_FILE } from "../../kit/types.js";
 
 export const name = "update-tokens";
 
 export const description =
   "Update design token values in the active kit. Changes are applied to tokens.css, tokens.json, " +
-  "and DESIGN.md simultaneously so the design system stays consistent. Use this when the user wants " +
+  "and layout.md simultaneously so the design system stays consistent. Use this when the user wants " +
   "to tweak colours, spacing, typography, or other token values without re-extracting from Figma.";
 
 export const inputSchema = {
@@ -59,7 +59,7 @@ export function handler() {
 
     let css = readFileSync(cssPath, "utf-8");
     const jsonPath = join(dir, TOKENS_JSON_FILE);
-    const mdPath = join(dir, DESIGN_MD_FILE);
+    const mdPath = join(dir, LAYOUT_MD_FILE);
 
     let tokensJson: Record<string, unknown> | null = null;
     if (existsSync(jsonPath)) {
@@ -70,9 +70,9 @@ export function handler() {
       }
     }
 
-    let designMd: string | null = null;
+    let layoutMd: string | null = null;
     if (existsSync(mdPath)) {
-      designMd = readFileSync(mdPath, "utf-8");
+      layoutMd = readFileSync(mdPath, "utf-8");
     }
 
     const results: TokenResult[] = [];
@@ -106,19 +106,19 @@ export function handler() {
         jsonMatchPath = updateJsonToken(tokensJson, oldValue, newValue);
       }
 
-      // Update DESIGN.md
+      // Update layout.md
       let mdCount = 0;
-      if (designMd && oldValue !== newValue) {
+      if (layoutMd && oldValue !== newValue) {
         const escapedOld = escapeForRegex(oldValue);
         // For hex colours, ensure we don't match partial (e.g. #5E6AD2 inside #5E6AD2FF)
         const mdPattern = isHexColour(oldValue)
           ? new RegExp(escapedOld + "(?![0-9a-fA-F])", "g")
           : new RegExp(escapedOld, "g");
 
-        const matches = designMd.match(mdPattern);
+        const matches = layoutMd.match(mdPattern);
         mdCount = matches?.length ?? 0;
         if (mdCount > 0) {
-          designMd = designMd.replace(mdPattern, newValue);
+          layoutMd = layoutMd.replace(mdPattern, newValue);
         }
       }
 
@@ -140,8 +140,8 @@ export function handler() {
         writeFileSync(jsonPath, JSON.stringify(tokensJson, null, 2) + "\n");
       }
 
-      if (designMd) {
-        writeFileSync(mdPath, designMd);
+      if (layoutMd) {
+        writeFileSync(mdPath, layoutMd);
       }
     }
 
@@ -160,9 +160,9 @@ export function handler() {
           lines.push(`    ⚠ tokens.json (no matching $value found)`);
         }
         if (r.mdCount > 0) {
-          lines.push(`    ✓ DESIGN.md (${r.mdCount} occurrence${r.mdCount === 1 ? "" : "s"})`);
-        } else if (designMd) {
-          lines.push(`    – DESIGN.md (old value not found in text)`);
+          lines.push(`    ✓ layout.md (${r.mdCount} occurrence${r.mdCount === 1 ? "" : "s"})`);
+        } else if (layoutMd) {
+          lines.push(`    – layout.md (old value not found in text)`);
         }
       }
     }

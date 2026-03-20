@@ -1,4 +1,4 @@
-import { readFileSync, existsSync, readdirSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync, renameSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Kit, KitManifest, KitComponent } from "./types.js";
@@ -6,13 +6,13 @@ import {
   LAYOUT_DIR,
   LEGACY_DIR,
   KIT_MANIFEST_FILE,
-  DESIGN_MD_FILE,
+  LAYOUT_MD_FILE,
   TOKENS_CSS_FILE,
   TOKENS_JSON_FILE,
   TAILWIND_CONFIG_FILE,
   COMPONENTS_DIR,
 } from "./types.js";
-import { parseDesignMd, parseComponents } from "./parser.js";
+import { parseLayoutMd, parseComponents } from "./parser.js";
 
 /**
  * Load a kit from a .layout/ directory.
@@ -37,9 +37,18 @@ export function loadKit(basePath?: string): Kit | null {
   }
 
   const manifestPath = join(dir, KIT_MANIFEST_FILE);
-  const designMdPath = join(dir, DESIGN_MD_FILE);
+  let layoutMdPath = join(dir, LAYOUT_MD_FILE);
 
-  if (!existsSync(designMdPath)) return null;
+  // Auto-migration: rename DESIGN.md → layout.md if the old file exists
+  if (!existsSync(layoutMdPath)) {
+    const legacyMdPath = join(dir, "DESIGN.md");
+    if (existsSync(legacyMdPath)) {
+      renameSync(legacyMdPath, layoutMdPath);
+      console.log("  ℹ Renamed DESIGN.md → layout.md (Layout rebrand)");
+    }
+  }
+
+  if (!existsSync(layoutMdPath)) return null;
 
   const manifest: KitManifest = existsSync(manifestPath)
     ? JSON.parse(readFileSync(manifestPath, "utf-8"))
@@ -55,10 +64,10 @@ export function loadKit(basePath?: string): Kit | null {
         aesthetic: "",
       };
 
-  const designMd = readFileSync(designMdPath, "utf-8");
-  const sections = parseDesignMd(designMd);
+  const layoutMd = readFileSync(layoutMdPath, "utf-8");
+  const sections = parseLayoutMd(layoutMd);
 
-  let components = parseComponents(designMd);
+  let components = parseComponents(layoutMd);
 
   // Also load individual component files if present
   const componentsDir = join(dir, COMPONENTS_DIR);
@@ -77,7 +86,7 @@ export function loadKit(basePath?: string): Kit | null {
 
   return {
     manifest,
-    designMd,
+    layoutMd,
     sections,
     components,
     tokensCss: tokensCss ?? undefined,

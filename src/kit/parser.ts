@@ -1,10 +1,10 @@
 import type { KitSection, KitComponent } from "./types.js";
 
 /**
- * Parse a DESIGN.md file into structured sections.
+ * Parse a layout.md file into structured sections.
  * Splits on ## headings and extracts section IDs.
  */
-export function parseDesignMd(content: string): KitSection[] {
+export function parseLayoutMd(content: string): KitSection[] {
   const sections: KitSection[] = [];
   const lines = content.split("\n");
 
@@ -40,7 +40,7 @@ export function parseDesignMd(content: string): KitSection[] {
 }
 
 /**
- * Extract Quick Reference section (Section 0) from DESIGN.md.
+ * Extract Quick Reference section (Section 0) from layout.md.
  * This is the 50-75 line summary optimised for LLM context windows.
  */
 export function extractQuickReference(content: string): string {
@@ -66,7 +66,7 @@ export function extractSection(
 }
 
 /**
- * Parse component specs from DESIGN.md or individual component files.
+ * Parse component specs from layout.md or individual component files.
  * Components are expected in a "## Components" section with ### per component.
  */
 export function parseComponents(content: string): KitComponent[] {

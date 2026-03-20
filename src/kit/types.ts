@@ -26,7 +26,7 @@ export interface KitComponent {
 
 export interface Kit {
   manifest: KitManifest;
-  designMd: string;
+  layoutMd: string;
   sections: KitSection[];
   components: KitComponent[];
   tokensCss?: string;
@@ -46,7 +46,7 @@ export interface RegistryEntry {
 export const LAYOUT_DIR = ".layout";
 export const LEGACY_DIR = ".superduper"; // Deprecated — remove in v1.0
 export const KIT_MANIFEST_FILE = "kit.json";
-export const DESIGN_MD_FILE = "DESIGN.md";
+export const LAYOUT_MD_FILE = "layout.md";
 export const TOKENS_CSS_FILE = "tokens.css";
 export const TOKENS_JSON_FILE = "tokens.json";
 export const TAILWIND_CONFIG_FILE = "tailwind.config.js";
