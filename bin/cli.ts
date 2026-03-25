@@ -85,7 +85,8 @@ program
   .command("doctor")
   .description("Check Node.js version, Claude CLI, and MCP dependencies")
   .option("--fix", "Auto-install missing MCP servers")
-  .action(async (options: { fix?: boolean }) => {
+  .option("--verbose", "Show detailed diagnostic output including raw MCP server data")
+  .action(async (options: { fix?: boolean; verbose?: boolean }) => {
     await doctorCommand(options);
   });
 

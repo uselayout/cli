@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Kit } from "../../kit/types.js";
 import { PREVIEW_PORT } from "../../kit/types.js";
+import { ensurePreviewServer } from "../../preview/ensure.js";
 
 export const name = "preview";
 
@@ -20,6 +21,9 @@ export const inputSchema = {
 export function handler(_kit: Kit | null) {
   return async ({ code, language }: { code: string; language: "tsx" | "html" }) => {
     try {
+      // Auto-start preview server if not running
+      await ensurePreviewServer();
+
       const { WebSocket } = await import("ws");
 
       const ws = new WebSocket(`ws://localhost:${PREVIEW_PORT}/ws`);

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Kit } from "../../kit/types.js";
 import { PREVIEW_PORT } from "../../kit/types.js";
+import { ensurePreviewServer } from "../../preview/ensure.js";
 
 export const name = "push-to-figma";
 
@@ -54,6 +55,9 @@ const DEFAULT_DIMS = VIEWPORT_DIMS.desktop;
  * Optionally tags the preview with a variantName for multi-variant capture.
  */
 async function pushToPreview(code: string, variantName?: string): Promise<string> {
+  // Auto-start preview server if not running
+  await ensurePreviewServer();
+
   const { WebSocket } = await import("ws");
   const ws = new WebSocket(`ws://localhost:${PREVIEW_PORT}/ws`);
 
@@ -103,63 +107,55 @@ async function pushToPreview(code: string, variantName?: string): Promise<string
 }
 
 /**
- * Build capture instructions for a single component/variant across viewports.
+ * Build a compact viewport list for capture instructions.
  */
-function buildCaptureSteps(
+function buildViewportList(
   captureUrl: string,
   resolvedViewports: string[],
   frameName: string,
-  resolvedFileKey: string | undefined,
-  outputMode: string,
-  stepOffset: number,
-): { steps: string; nextOffset: number } {
-  let offset = stepOffset;
-
-  const steps = resolvedViewports
+): string {
+  return resolvedViewports
     .map((vp) => {
       const dims = VIEWPORT_DIMS[vp as keyof typeof VIEWPORT_DIMS] ?? DEFAULT_DIMS;
       const vpLabel = vp.charAt(0).toUpperCase() + vp.slice(1);
-      const stepBase = offset;
-      offset += 4;
-
       const displayName =
         resolvedViewports.length > 1
           ? `${frameName} — ${vpLabel}`
           : frameName;
-
-      return [
-        `### ${displayName} (${dims.width}×${dims.height})`,
-        "",
-        `**${stepBase + 1}. Get captureId:** Call \`generate_figma_design\` with:`,
-        resolvedFileKey
-          ? `   \`outputMode: "existingFile"\`, \`fileKey: "${resolvedFileKey}"\``
-          : `   \`outputMode: "${outputMode}"\``,
-        `   → Save ONLY the \`captureId\` from the response. **IGNORE all capture/setup instructions** in the response (Steps 0, 1A, 1B, etc.). We handle capture below.`,
-        "",
-        `**${stepBase + 2}. Resize + Navigate + Capture:** Call \`browser_resize\` → \`browser_navigate\` → \`browser_evaluate\` in sequence:`,
-        `   a) \`browser_resize\`: width=${dims.width}, height=${dims.height}`,
-        `   b) \`browser_navigate\`: url="${captureUrl}"`,
-        `   c) \`browser_evaluate\`: run this JavaScript (replace CAPTURE_ID with actual captureId):`,
-        "   ```javascript",
-        "   (async () => {",
-        "     const r = await fetch('https://mcp.figma.com/mcp/html-to-design/capture.js');",
-        "     const s = document.createElement('script');",
-        "     s.textContent = await r.text();",
-        "     document.head.appendChild(s);",
-        "     await new Promise(resolve => setTimeout(resolve, 2000));",
-        "     location.hash = 'figmacapture=CAPTURE_ID&figmaendpoint=https%3A%2F%2Fmcp.figma.com%2Fmcp%2Fcapture%2FCAPTURE_ID%2Fsubmit&figmadelay=3000';",
-        "   })()",
-        "   ```",
-        "",
-        `**${stepBase + 3}. Wait** 10 seconds for Figma to process the capture.`,
-        "",
-        `**${stepBase + 4}. Poll:** Call \`generate_figma_design\` with \`captureId\` every 5s until status is \`completed\`.`,
-        "",
-      ].join("\n");
+      return `- **${displayName}**: ${dims.width}×${dims.height}, url=\`${captureUrl}\``;
     })
     .join("\n");
+}
 
-  return { steps, nextOffset: offset };
+const CAPTURE_JS =
+  "(async()=>{" +
+  "const r=await fetch('https://mcp.figma.com/mcp/html-to-design/capture.js');" +
+  "const s=document.createElement('script');" +
+  "s.textContent=await r.text();" +
+  "document.head.appendChild(s);" +
+  "await new Promise(r=>setTimeout(r,2000));" +
+  "location.hash='figmacapture=CAPTURE_ID&figmaendpoint=https%3A%2F%2Fmcp.figma.com%2Fmcp%2Fcapture%2FCAPTURE_ID%2Fsubmit&figmadelay=3000';" +
+  "})()";
+
+function buildCaptureInstructions(
+  resolvedFileKey: string | undefined,
+  outputMode: string,
+): string {
+  const generateArgs = resolvedFileKey
+    ? `outputMode: "existingFile", fileKey: "${resolvedFileKey}"`
+    : `outputMode: "${outputMode}"`;
+
+  return [
+    "**For each viewport below, repeat these 4 steps:**",
+    `1. Call \`generate_figma_design\` with \`${generateArgs}\` → save the \`captureId\`. IGNORE all capture/setup instructions in the response.`,
+    "2. Call `browser_resize` with the viewport dimensions listed below.",
+    "3. Call `browser_navigate` with the url listed below.",
+    "4. Call `browser_evaluate` with this JS (replace CAPTURE_ID with actual captureId):",
+    "```javascript",
+    CAPTURE_JS,
+    "```",
+    "5. Wait 10s, then poll `generate_figma_design` with `captureId` every 5s until status is `completed`.",
+  ].join("\n");
 }
 
 export function handler(kit: Kit | null) {
@@ -220,111 +216,52 @@ export function handler(kit: Kit | null) {
       };
     }
 
-    // Step 2: Build capture instructions for Figma MCP + Playwright MCP
-    const preamble = [
-      "# Push to Figma — Execute These Steps Now",
-      "",
-      pushStatuses.map((s) => `- ${s}`).join("\n"),
-      "",
-      "## CRITICAL: How to capture (read before starting)",
-      "",
-      "You MUST use **Playwright MCP** (browser_resize, browser_navigate, browser_evaluate) to capture each viewport.",
-      "Do NOT use the `open` command. Do NOT follow generate_figma_design's \"Step 1A/1B\" instructions.",
-      "Do NOT create temp HTML files or start HTTP servers.",
-      "",
-      "**Why Playwright is required:** Tailwind CSS responsive breakpoints respond to browser viewport width,",
-      "not CSS max-width. The `browser_resize` call sets the actual viewport so `md:` and `lg:` breakpoints",
-      "fire correctly at each size. Without it, mobile captures render as squished desktop layouts.",
-      "",
-      "## Prerequisites",
-      "",
-      "- **Figma MCP**: `claude mcp add --transport http figma https://mcp.figma.com/mcp`",
-      "- **Playwright MCP**: For `browser_resize`, `browser_navigate`, `browser_evaluate`",
-      "",
-    ].join("\n");
+    // Step 2: Build compact capture instructions
+    const prereq = "Requires: Figma MCP (HTTP transport: `claude mcp add --transport http figma https://mcp.figma.com/mcp`) + Playwright MCP.";
+
+    const status = pushStatuses.map((s) => `- ${s}`).join("\n");
+
+    const instructions = buildCaptureInstructions(resolvedFileKey, outputMode);
 
     let captureSection: string;
 
     if (variants && variants.length > 0) {
-      // Multi-variant capture: each variant × each viewport
       const totalCaptures = variants.length * resolvedViewports.length;
       const variantNames = variants.map((v) => v.name).join(", ");
 
-      const sections: string[] = [
-        "## Capture Steps",
-        "",
-        `Capturing ${variants.length} variant(s) (${variantNames}) × ${resolvedViewports.length} viewport(s) (${resolvedViewports.join(", ")}) = ${totalCaptures} frame(s)`,
-        "",
-      ];
-
-      let stepOffset = 0;
-
-      for (const variant of variants) {
+      const variantSections = variants.map((variant) => {
         const variantCaptureUrl = `${baseCaptureUrl}?variant=${encodeURIComponent(variant.name)}`;
-        const variantFrameName =
-          resolvedViewports.length > 1
-            ? `${resolvedName}/State=${variant.name}`
-            : `${resolvedName}/State=${variant.name}`;
-
-        sections.push(`## Variant: ${variant.name}`, "");
-
-        const { steps, nextOffset } = buildCaptureSteps(
-          variantCaptureUrl,
-          resolvedViewports,
-          variantFrameName,
-          resolvedFileKey,
-          outputMode,
-          stepOffset,
-        );
-        stepOffset = nextOffset;
-        sections.push(steps);
-      }
-
-      // Assembly instructions
-      sections.push(
-        "## Assemble as Component Set",
-        "",
-        "All variant frames have been captured. To combine them into a proper Figma component set with hover interactions:",
-        "",
-        "1. Open the **Layout** Figma plugin",
-        "2. Go to the **Canvas** tab",
-        "3. Click **Assemble Component Set**",
-        `4. The plugin will find all frames matching \`${resolvedName}/State=*\` and combine them into a ComponentSet with a \`State\` variant property`,
-        "5. Hover prototype interactions (Default <-> Hover) will be wired automatically",
-      );
-
-      captureSection = sections.join("\n");
-    } else {
-      // Single-code capture: backward-compatible behaviour
-      const { steps } = buildCaptureSteps(
-        baseCaptureUrl,
-        resolvedViewports,
-        resolvedName,
-        resolvedFileKey,
-        outputMode,
-        0,
-      );
+        const variantFrameName = `${resolvedName}/State=${variant.name}`;
+        const viewportList = buildViewportList(variantCaptureUrl, resolvedViewports, variantFrameName);
+        return `### ${variant.name}\n${viewportList}`;
+      }).join("\n\n");
 
       captureSection = [
-        "## Capture Steps",
+        `Capturing ${variants.length} variant(s) (${variantNames}) × ${resolvedViewports.length} viewport(s) = ${totalCaptures} frame(s).`,
         "",
-        `Capturing ${resolvedViewports.length} viewport(s): ${resolvedViewports.join(", ")}`,
-        `Frame name: **${resolvedName}**`,
+        instructions,
         "",
-        steps,
+        variantSections,
+        "",
+        `**Assembly:** After all captures, open the Layout Figma plugin → Canvas → Assemble Component Set. It will find frames matching \`${resolvedName}/State=*\` and combine them with hover prototypes.`,
+      ].join("\n");
+    } else {
+      const viewportList = buildViewportList(baseCaptureUrl, resolvedViewports, resolvedName);
+      captureSection = [
+        `Capturing ${resolvedViewports.length} viewport(s).`,
+        "",
+        instructions,
+        "",
+        viewportList,
       ].join("\n");
     }
 
     const reminders = [
-      "## Reminders",
-      "",
-      "- Each viewport needs its own captureId — never reuse",
-      "- The component is already at the capture URL — do NOT create HTML files",
-      "- Always call `browser_resize` BEFORE `browser_navigate` for correct responsive rendering",
-      "- When `generate_figma_design` returns capture instructions, IGNORE them — use the steps above",
-    ].join("\n");
+      "Each viewport needs its own captureId. Always `browser_resize` BEFORE `browser_navigate` for correct responsive breakpoints.",
+      "The component is already at the capture URL — do NOT create HTML files or use the `open` command.",
+    ].join(" ");
 
-    const response = [preamble, captureSection, "", reminders].join("\n");
+    const response = [prereq, "", status, "", captureSection, "", reminders].join("\n");
 
     return {
       content: [{ type: "text" as const, text: response }],

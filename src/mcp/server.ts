@@ -4,6 +4,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { loadKit } from "../kit/loader.js";
 import type { Kit } from "../kit/types.js";
 import { startPreviewServer } from "../preview/server.js";
+import { setPreviewServer } from "../preview/ensure.js";
 
 const require = createRequire(import.meta.url);
 // Resolves from dist/src/mcp/server.js → ../../../package.json
@@ -21,6 +22,7 @@ import * as urlToFigma from "./tools/url-to-figma.js";
 import * as designInFigma from "./tools/design-in-figma.js";
 import * as updateTokens from "./tools/update-tokens.js";
 import * as getScreenshots from "./tools/get-screenshots.js";
+import * as checkSetup from "./tools/check-setup.js";
 
 /**
  * Start the Layout Context MCP server.
@@ -38,12 +40,14 @@ export async function startServer(): Promise<void> {
   );
 
   // Start the preview server (HTTP + WebSocket on :4321)
+  // If this fails, tools will auto-start it on demand via ensurePreviewServer()
   try {
-    const previewServer = await startPreviewServer(undefined, { openBrowser: false });
-    console.error(`[layout-context] Preview: ${previewServer.url}`);
+    const server = await startPreviewServer(undefined, { openBrowser: false });
+    setPreviewServer(server);
+    console.error(`[layout-context] Preview: ${server.url}`);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`[layout-context] Preview server skipped: ${msg}`);
+    console.error(`[layout-context] Preview server skipped (will auto-start on demand): ${msg}`);
   }
 
   const server = new McpServer({
@@ -51,7 +55,7 @@ export async function startServer(): Promise<void> {
     version: pkg.version,
   });
 
-  // Register all 11 tools
+  // Register all 12 tools
   server.tool(
     getDesignSystem.name,
     getDesignSystem.description,
@@ -127,6 +131,13 @@ export async function startServer(): Promise<void> {
     getScreenshots.description,
     getScreenshots.inputSchema,
     getScreenshots.handler()
+  );
+
+  server.tool(
+    checkSetup.name,
+    checkSetup.description,
+    checkSetup.inputSchema,
+    checkSetup.handler()
   );
 
   // Connect via stdio
