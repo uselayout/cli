@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import chalk from "chalk";
@@ -17,7 +18,7 @@ interface McpConfig {
   [key: string]: unknown;
 }
 
-type Target = "claude" | "cursor" | "windsurf";
+type Target = "claude" | "cursor" | "windsurf" | "vscode" | "codex" | "gemini";
 
 const TARGET_INFO: Record<Target, { label: string; configPath: string; serverKey: string }> = {
   claude: {
@@ -33,6 +34,21 @@ const TARGET_INFO: Record<Target, { label: string; configPath: string; serverKey
   windsurf: {
     label: "Windsurf",
     configPath: ".windsurf/mcp.json",
+    serverKey: "layout",
+  },
+  vscode: {
+    label: "VS Code / Copilot",
+    configPath: ".vscode/mcp.json",
+    serverKey: "layout",
+  },
+  codex: {
+    label: "Codex CLI",
+    configPath: ".codex/config.json",
+    serverKey: "layout",
+  },
+  gemini: {
+    label: "Gemini CLI",
+    configPath: ".gemini/settings.json",
     serverKey: "layout",
   },
 };
@@ -66,6 +82,31 @@ function detectTargets(): Target[] {
   // Windsurf — .windsurf/ dir
   if (fs.existsSync(path.join(cwd, ".windsurf"))) {
     detected.push("windsurf");
+  }
+
+  // VS Code / GitHub Copilot — .vscode/ dir
+  if (fs.existsSync(path.join(cwd, ".vscode"))) {
+    detected.push("vscode");
+  }
+
+  // Codex CLI — check if `codex` CLI is available or ~/.codex/ exists
+  try {
+    execFileSync("which", ["codex"], { stdio: "ignore" });
+    detected.push("codex");
+  } catch {
+    if (fs.existsSync(path.join(os.homedir(), ".codex"))) {
+      detected.push("codex");
+    }
+  }
+
+  // Gemini CLI — check if `gemini` CLI is available or ~/.gemini/ exists
+  try {
+    execFileSync("which", ["gemini"], { stdio: "ignore" });
+    detected.push("gemini");
+  } catch {
+    if (fs.existsSync(path.join(os.homedir(), ".gemini"))) {
+      detected.push("gemini");
+    }
   }
 
   return detected;
@@ -165,6 +206,87 @@ function addMcpServerViaFile(target: Target): boolean {
   return true;
 }
 
+interface VsCodeMcpConfig {
+  inputs?: unknown[];
+  servers?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+function addMcpServerViaVsCode(): boolean {
+  const configFile = path.join(process.cwd(), ".vscode", "mcp.json");
+  const configDir = path.dirname(configFile);
+
+  let config: VsCodeMcpConfig = {};
+  if (fs.existsSync(configFile)) {
+    try {
+      config = JSON.parse(fs.readFileSync(configFile, "utf-8")) as VsCodeMcpConfig;
+    } catch {
+      console.log(
+        chalk.yellow("Warning:"),
+        "Could not parse .vscode/mcp.json, creating new config."
+      );
+    }
+  }
+
+  if (config.servers && "layout" in config.servers) {
+    console.log(chalk.dim("  ↳"), "VS Code / Copilot: already configured in .vscode/mcp.json");
+    return false;
+  }
+
+  if (!config.servers) config.servers = {};
+  config.servers.layout = {
+    type: "stdio",
+    command: "npx",
+    args: ["-y", "@layoutdesign/context", "serve"],
+  };
+
+  fs.mkdirSync(configDir, { recursive: true });
+  fs.writeFileSync(configFile, JSON.stringify(config, null, 2) + "\n");
+
+  console.log(chalk.green("  ✓"), "VS Code / Copilot: added to .vscode/mcp.json");
+  return true;
+}
+
+function addMcpServerGlobal(target: "codex" | "gemini"): boolean {
+  const info = TARGET_INFO[target];
+  const configFile = path.join(os.homedir(), info.configPath);
+  const configDir = path.dirname(configFile);
+
+  let config: McpConfig = {};
+  if (fs.existsSync(configFile)) {
+    try {
+      config = JSON.parse(fs.readFileSync(configFile, "utf-8")) as McpConfig;
+    } catch {
+      console.log(
+        chalk.yellow("Warning:"),
+        `Could not parse ~/${info.configPath}, creating new config.`
+      );
+    }
+  }
+
+  if (config.mcpServers && info.serverKey in config.mcpServers) {
+    console.log(
+      chalk.dim("  ↳"),
+      `${info.label}: already configured in ~/${info.configPath}`
+    );
+    return false;
+  }
+
+  if (!config.mcpServers) {
+    config.mcpServers = {};
+  }
+  config.mcpServers[info.serverKey] = MCP_CONFIG;
+
+  fs.mkdirSync(configDir, { recursive: true });
+  fs.writeFileSync(configFile, JSON.stringify(config, null, 2) + "\n");
+
+  console.log(
+    chalk.green("  ✓"),
+    `${info.label}: added to ~/${info.configPath}`
+  );
+  return true;
+}
+
 /**
  * Add Figma MCP server — delegates to shared utility, logs result.
  */
@@ -226,7 +348,7 @@ export async function installCommand(options: {
     if (!(t in TARGET_INFO)) {
       console.log(
         chalk.red("Error:"),
-        `Unknown target "${options.target}". Use: claude, cursor, or windsurf`
+        `Unknown target "${options.target}". Use: claude, cursor, windsurf, vscode, codex, or gemini`
       );
       return;
     }
@@ -254,6 +376,10 @@ export async function installCommand(options: {
   for (const target of targets) {
     if (target === "claude") {
       if (addClaudeMcpServer(options.global ?? false)) installed++;
+    } else if (target === "vscode") {
+      if (addMcpServerViaVsCode()) installed++;
+    } else if (target === "codex" || target === "gemini") {
+      if (addMcpServerGlobal(target)) installed++;
     } else {
       if (addMcpServerViaFile(target)) installed++;
     }
