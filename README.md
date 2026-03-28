@@ -22,7 +22,7 @@ npx @layoutdesign/context init --kit linear-lite
 npx @layoutdesign/context install
 ```
 
-That's it. The `install` command detects Claude Code, Cursor, and Windsurf automatically and configures the MCP server for the current project.
+That's it. The `install` command detects Claude Code, Cursor, Windsurf, VS Code / Copilot, Codex CLI, and Gemini CLI automatically and configures the MCP server.
 
 Your agent now has access to your full design system on every request.
 
@@ -62,10 +62,10 @@ Eleven tools are registered with the MCP server automatically.
 | `init` | Initialise `.layout/` in the current directory, optionally with a starter kit. |
 | `init --kit <name>` | Initialise with a specific kit (e.g. `linear-lite`). |
 | `serve` | Start the MCP server. This is what your AI agent connects to. |
-| `install` | Auto-configure MCP settings for Claude Code, Cursor, and Windsurf in one step. |
-| `install --target <tool>` | Target a specific tool: `claude`, `cursor`, or `windsurf`. |
+| `install` | Auto-configure MCP settings for Claude Code, Cursor, Windsurf, VS Code / Copilot, Codex CLI, and Gemini CLI. |
+| `install --target <tool>` | Target a specific tool: `claude`, `cursor`, `windsurf`, `vscode`, `codex`, or `gemini`. |
 | `install --global` | Install globally so the MCP server is available in all projects (Claude Code only). |
-| `doctor` | Check Node.js version, Claude CLI, and MCP dependencies (Figma, Playwright). Use `--fix` to auto-install any missing tools. |
+| `doctor` | Check Node.js version, AI tool CLIs, and MCP dependencies (Figma, Playwright). Use `--fix` to auto-install any missing tools. |
 | `doctor --fix` | Auto-install missing dependencies (Figma MCP, Playwright MCP). |
 | `serve-local <path>` | Serve a local directory over HTTP for use with the `url-to-figma` MCP tool. Requires Python 3. |
 | `list` | List all available kits (free and pro). |
@@ -146,7 +146,7 @@ The easiest way to configure any supported editor is:
 npx @layoutdesign/context install
 ```
 
-This auto-detects Claude Code, Cursor, and Windsurf and configures the MCP server. For Claude Code it uses `claude mcp add` (the reliable method); for Cursor and Windsurf it writes the appropriate config file.
+This auto-detects Claude Code, Cursor, Windsurf, VS Code / Copilot, Codex CLI, and Gemini CLI and configures the MCP server. For Claude Code it uses `claude mcp add`; for other tools it writes the appropriate config file (`.cursor/mcp.json`, `.windsurf/mcp.json`, `.vscode/mcp.json`, `~/.codex/config.json`, or `~/.gemini/settings.json`).
 
 ### Per-Project vs Global
 
@@ -205,6 +205,46 @@ If you prefer to configure manually:
 ```
 
 **Windsurf** (`.windsurf/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "layout": {
+      "command": "npx",
+      "args": ["-y", "@layoutdesign/context", "serve"]
+    }
+  }
+}
+```
+
+**VS Code / GitHub Copilot** (`.vscode/mcp.json`):
+
+```json
+{
+  "servers": {
+    "layout": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@layoutdesign/context", "serve"]
+    }
+  }
+}
+```
+
+**Codex CLI** (`~/.codex/config.json` — global):
+
+```json
+{
+  "mcpServers": {
+    "layout": {
+      "command": "npx",
+      "args": ["-y", "@layoutdesign/context", "serve"]
+    }
+  }
+}
+```
+
+**Gemini CLI** (`~/.gemini/settings.json` — global):
 
 ```json
 {

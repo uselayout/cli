@@ -217,7 +217,7 @@ export function handler(kit: Kit | null) {
     }
 
     // Step 2: Build compact capture instructions
-    const prereq = "Requires: Figma MCP (HTTP transport: `claude mcp add --transport http figma https://mcp.figma.com/mcp`) + Playwright MCP.";
+    const prereq = "Requires: Figma MCP + Playwright MCP. Run `npx @layoutdesign/context install` to auto-configure, or see https://layout.design/docs/cli for manual setup.";
 
     const status = pushStatuses.map((s) => `- ${s}`).join("\n");
 

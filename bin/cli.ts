@@ -61,8 +61,8 @@ program
 
 program
   .command("install")
-  .description("Auto-configure MCP servers (Layout + Figma + Playwright) for Claude Code, Cursor, or Windsurf")
-  .option("--target <tool>", "Specific tool: claude, cursor, or windsurf")
+  .description("Auto-configure MCP servers (Layout + Figma + Playwright) for Claude Code, Cursor, Windsurf, VS Code, Codex, or Gemini")
+  .option("--target <tool>", "Specific tool: claude, cursor, windsurf, vscode, codex, or gemini")
   .option("--global", "Install globally (available in all projects, Claude Code only)")
   .option("--skip-figma", "Skip Figma and Playwright MCP setup")
   .action(async (options: { target?: string; global?: boolean; skipFigma?: boolean }) => {
@@ -83,7 +83,7 @@ program
 
 program
   .command("doctor")
-  .description("Check Node.js version, Claude CLI, and MCP dependencies")
+  .description("Check Node.js version, AI tool CLIs, and MCP dependencies")
   .option("--fix", "Auto-install missing MCP servers")
   .option("--verbose", "Show detailed diagnostic output including raw MCP server data")
   .action(async (options: { fix?: boolean; verbose?: boolean }) => {

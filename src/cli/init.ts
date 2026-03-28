@@ -67,21 +67,15 @@ export async function initCommand(options: {
     `  ${chalk.dim("1.")} Edit ${chalk.cyan(`.layout/${LAYOUT_MD_FILE}`)} with your design system`
   );
   console.log(
-    `  ${chalk.dim("2.")} Add the MCP server to your AI coding agent:`
+    `  ${chalk.dim("2.")} Configure your AI coding agent:`
   );
   console.log();
-  console.log(chalk.dim("  Claude Code (claude_desktop_config.json):"));
   console.log(
-    chalk.gray(
-      `    { "mcpServers": { "design": { "command": "npx", "args": ["@layoutdesign/context", "serve"] } } }`
-    )
+    `     ${chalk.cyan("npx @layoutdesign/context install")}`
   );
   console.log();
-  console.log(chalk.dim("  Cursor (.cursor/mcp.json):"));
   console.log(
-    chalk.gray(
-      `    { "mcpServers": { "design": { "command": "npx", "args": ["@layoutdesign/context", "serve"] } } }`
-    )
+    chalk.dim("     Auto-detects Claude Code, Cursor, Windsurf, VS Code / Copilot, Codex, and Gemini CLI.")
   );
 }
 

@@ -95,7 +95,7 @@ export function handler() {
       "## Prerequisites",
       "",
       "Both MCP servers must be connected:",
-      "- **Figma MCP**: `claude mcp add --transport http figma https://mcp.figma.com/mcp`",
+      "- **Figma MCP**: Run `npx @layoutdesign/context install` to auto-configure",
       "- **Playwright MCP**: Must be available for `browser_navigate`, `browser_resize`, `browser_evaluate`",
       "",
       "## Auto-Layout",

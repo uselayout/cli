@@ -188,7 +188,7 @@ export function handler(kit: Kit | null) {
       "## Setup (if Figma MCP is not connected)",
       "",
       "```bash",
-      "claude mcp add --transport http figma https://mcp.figma.com/mcp",
+      "npx @layoutdesign/context install",
       "```",
       "",
       "Authentication is via OAuth — no API key needed.",

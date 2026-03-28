@@ -1,4 +1,7 @@
 import { execFileSync } from "node:child_process";
+import os from "node:os";
+import fs from "node:fs";
+import path from "node:path";
 import chalk from "chalk";
 import {
   checkMcpRegistration,
@@ -41,7 +44,7 @@ export async function doctorCommand(options?: {
 
   const results: CheckResult[] = [
     checkNodeVersion(),
-    checkClaudeCli(),
+    ...checkToolClis(),
   ];
 
   // MCP server checks (deep Figma diagnostics)
@@ -160,23 +163,88 @@ function checkNodeVersion(): CheckResult {
   };
 }
 
-function checkClaudeCli(): CheckResult {
-  try {
-    execFileSync("which", ["claude"], { stdio: "ignore" });
-    return {
-      label: "Claude CLI",
-      ok: true,
-      detail: "found",
-    };
-  } catch {
-    return {
-      label: "Claude CLI",
+function checkToolClis(): CheckResult[] {
+  const results: CheckResult[] = [];
+  const cwd = process.cwd();
+
+  const tools: { name: string; cli: string; detect: () => boolean; installUrl?: string }[] = [
+    {
+      name: "Claude Code",
+      cli: "claude",
+      detect: () => {
+        try {
+          execFileSync("which", ["claude"], { stdio: "ignore" });
+          return true;
+        } catch {
+          return (
+            fs.existsSync(path.join(cwd, ".claude")) ||
+            fs.existsSync(path.join(cwd, "CLAUDE.md"))
+          );
+        }
+      },
+      installUrl: "https://docs.anthropic.com/en/docs/claude-code",
+    },
+    {
+      name: "Cursor",
+      cli: "cursor",
+      detect: () =>
+        fs.existsSync(path.join(cwd, ".cursor")) ||
+        fs.existsSync(path.join(cwd, ".cursorrules")),
+    },
+    {
+      name: "Windsurf",
+      cli: "windsurf",
+      detect: () => fs.existsSync(path.join(cwd, ".windsurf")),
+    },
+    {
+      name: "VS Code / Copilot",
+      cli: "code",
+      detect: () => fs.existsSync(path.join(cwd, ".vscode")),
+    },
+    {
+      name: "Codex CLI",
+      cli: "codex",
+      detect: () => {
+        try {
+          execFileSync("which", ["codex"], { stdio: "ignore" });
+          return true;
+        } catch {
+          return fs.existsSync(path.join(os.homedir(), ".codex"));
+        }
+      },
+    },
+    {
+      name: "Gemini CLI",
+      cli: "gemini",
+      detect: () => {
+        try {
+          execFileSync("which", ["gemini"], { stdio: "ignore" });
+          return true;
+        } catch {
+          return fs.existsSync(path.join(os.homedir(), ".gemini"));
+        }
+      },
+    },
+  ];
+
+  const detected = tools.filter((t) => t.detect());
+
+  if (detected.length === 0) {
+    results.push({
+      label: "AI coding tools",
       ok: false,
-      detail: "not found in PATH",
-      fix: "Install Claude Code: https://docs.anthropic.com/en/docs/claude-code",
-      requiredBy: "MCP server registration, doctor checks",
-    };
+      detail: "no tools detected — install Claude Code, Cursor, Windsurf, VS Code, Codex, or Gemini CLI",
+      fix: "Install at least one AI coding tool, then run: npx @layoutdesign/context install",
+    });
+  } else {
+    results.push({
+      label: "AI coding tools",
+      ok: true,
+      detail: detected.map((t) => t.name).join(", "),
+    });
   }
+
+  return results;
 }
 
 /**
@@ -220,7 +288,7 @@ async function checkMcpServersDeep(verbose: boolean): Promise<CheckResult[]> {
       detail += ` (transport: ${entry?.transport ?? "unknown"})`;
       warning =
         "Figma MCP should use HTTP transport for OAuth. " +
-        "Re-register with: claude mcp add --scope user --transport http figma https://mcp.figma.com/mcp";
+        "Re-register with: npx @layoutdesign/context install --target claude, or manually configure for your tool";
     } else {
       detail += " (http transport)";
     }
@@ -232,7 +300,7 @@ async function checkMcpServersDeep(verbose: boolean): Promise<CheckResult[]> {
       if (!warning) {
         warning =
           "Figma MCP is registered at project scope — consider user scope for cross-project availability. " +
-          "Re-register with: claude mcp add --scope user --transport http figma https://mcp.figma.com/mcp";
+          "Re-register with: npx @layoutdesign/context install --target claude, or manually configure for your tool";
       }
     } else {
       detail += ", user scope";
@@ -260,7 +328,7 @@ async function checkMcpServersDeep(verbose: boolean): Promise<CheckResult[]> {
       label: "Figma MCP",
       ok: false,
       detail: "not found in MCP server list",
-      fix: "claude mcp add --scope user --transport http figma https://mcp.figma.com/mcp",
+      fix: "npx @layoutdesign/context install (auto-configures for your tool)",
       fixCmd: [
         "claude", "mcp", "add", "--scope", "user", "--transport", "http",
         "figma", "https://mcp.figma.com/mcp",
@@ -298,7 +366,7 @@ async function checkMcpServersDeep(verbose: boolean): Promise<CheckResult[]> {
           label: "Playwright MCP",
           ok: false,
           detail: "not found in MCP server list",
-          fix: "claude mcp add --scope user playwright -- npx -y @anthropic-ai/mcp-playwright",
+          fix: "npx @layoutdesign/context install (auto-configures for your tool)",
           fixCmd: [
             "claude", "mcp", "add", "--scope", "user",
             "playwright", "--", "npx", "-y", "@anthropic-ai/mcp-playwright",

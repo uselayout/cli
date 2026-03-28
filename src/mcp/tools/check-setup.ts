@@ -139,8 +139,7 @@ async function checkFigma(
         }
       } else if (!state.figma.correctTransport || state.figma.pluginShadow) {
         lines.push(
-          "- **To fix:** Run `claude mcp add --scope user --transport http figma https://mcp.figma.com/mcp`\n" +
-            "- Or call this tool again with `fix: true`\n"
+          "- **To fix:** Run `npx @layoutdesign/context install` to auto-configure, or call this tool again with `fix: true`\n"
         );
       }
     }
@@ -208,8 +207,7 @@ function checkPlaywright(
       }
     } else {
       lines.push(
-        "- **To fix:** Run `claude mcp add --scope user playwright -- npx -y @anthropic-ai/mcp-playwright`\n" +
-          "- Or call this tool again with `fix: true`\n"
+        "- **To fix:** Run `npx @layoutdesign/context install` to auto-configure, or call this tool again with `fix: true`\n"
       );
     }
   }
