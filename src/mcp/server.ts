@@ -23,6 +23,7 @@ import * as designInFigma from "./tools/design-in-figma.js";
 import * as updateTokens from "./tools/update-tokens.js";
 import * as getScreenshots from "./tools/get-screenshots.js";
 import * as checkSetup from "./tools/check-setup.js";
+import * as pushTokensToFigma from "./tools/push-tokens-to-figma.js";
 
 /**
  * Start the Layout Context MCP server.
@@ -138,6 +139,13 @@ export async function startServer(): Promise<void> {
     checkSetup.description,
     checkSetup.inputSchema,
     checkSetup.handler()
+  );
+
+  server.tool(
+    pushTokensToFigma.name,
+    pushTokensToFigma.description,
+    pushTokensToFigma.inputSchema,
+    pushTokensToFigma.handler(kit)
   );
 
   // Connect via stdio
