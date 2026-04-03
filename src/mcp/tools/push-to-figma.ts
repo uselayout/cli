@@ -247,28 +247,24 @@ function buildNativeResponse({
     "",
     "---",
     "",
-    "## Instructions",
+    "## NEXT STEP — YOU MUST DO THIS NOW",
     "",
-    `1. Call \`use_figma\` to create the component:`,
+    "Immediately call Figma MCP's `use_figma` tool to create this component. Do not ask the user — just do it.",
+    "",
+    `Call \`use_figma\` now with:`,
     resolvedFileKey
-      ? `   - Target file key: \`${resolvedFileKey}\``
-      : "   - This will create a new Figma file",
-    "   - Analyse the TSX code above to understand the component structure",
-    "   - Recreate the layout using Figma auto-layout (not absolute positioning)",
-    "   - Use the exact colours, fonts, spacing, and radius from the code/tokens",
-    "   - Create real text nodes with correct content, font, and size",
-    "",
-    "2. Create a frame for each viewport listed above, adapting the layout responsively.",
+      ? `- Target file key: \`${resolvedFileKey}\``
+      : "- Create a new Figma file",
+    "- Analyse the TSX code above to understand the component structure",
+    "- Recreate the layout using Figma auto-layout (not absolute positioning)",
+    "- Use the exact colours, fonts, spacing, and radius from the code/tokens",
+    "- Create real text nodes with correct content, font, and size",
+    "- Create a frame for each viewport listed above, adapting the layout responsively",
     "",
     variants && variants.length > 0
-      ? "3. Create each variant as a separate component, then combine into a component set with variant properties.\n"
+      ? "Create each variant as a separate component, then combine into a component set with variant properties.\n"
       : "",
-    "## Prerequisites",
-    "",
-    "Requires the Figma MCP server (Playwright MCP is NOT needed for native mode).",
-    "```bash",
-    "npx @layoutdesign/context install",
-    "```",
+    "If `use_figma` is not available, call the Layout MCP `check-setup` tool with `fix: true` to auto-configure the Figma MCP server.",
   ]
     .filter(Boolean)
     .join("\n");
