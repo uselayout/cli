@@ -5,7 +5,7 @@ import { loadKit } from "../kit/loader.js";
 import type { Kit } from "../kit/types.js";
 import { startPreviewServer } from "../preview/server.js";
 import { setPreviewServer } from "../preview/ensure.js";
-import { checkMcpRegistration, addFigmaMcpServer, fixGlobalClaudeJson } from "../cli/setup-utils.js";
+import { checkMcpRegistration, addFigmaMcpServer, addPlaywrightMcpServer, fixGlobalClaudeJson } from "../cli/setup-utils.js";
 
 const require = createRequire(import.meta.url);
 // Resolves from dist/src/mcp/server.js → ../../../package.json
@@ -80,6 +80,18 @@ export async function startServer(): Promise<void> {
         }
       } else {
         console.error("[layout-context] Figma MCP: OK");
+      }
+
+      // Check Playwright MCP (needed for capture mode and url-to-figma)
+      if (!mcpState.playwright.registered) {
+        console.error("[layout-context] Playwright MCP: not registered — auto-registering...");
+        const result = addPlaywrightMcpServer();
+        console.error(`[layout-context] Playwright MCP: ${result.message}`);
+        if (result.success) {
+          console.error("[layout-context] Playwright MCP: restart your agent to activate");
+        }
+      } else {
+        console.error("[layout-context] Playwright MCP: OK");
       }
     }
   } catch {
