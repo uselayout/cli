@@ -162,21 +162,58 @@ export function handler(kit: Kit | null) {
       "",
       "## NEXT STEP — YOU MUST DO THIS NOW",
       "",
-      "Immediately call Figma MCP's `use_figma` tool to create this design. Do not ask the user — just do it.",
+      "Immediately call Figma MCP's `use_figma` tool to create this design. Do not ask the user.",
       "",
-      `Call \`use_figma\` now with a detailed description that includes:`,
-      `- The full design brief, tokens, and component patterns above`,
-      fileKey ? `- Target file key: \`${fileKey}\`` : "- Create a new Figma file",
-      `- Frames for each viewport: ${viewportFrames}`,
-      "- Exact hex colour values from the token palette",
-      "- Font family, sizes, and weights from the typography tokens",
-      "- Spacing values in pixels, auto-layout direction, padding, and gap",
-      "- Component structure matching the patterns listed above",
+      fileKey ? `Target file key: \`${fileKey}\`` : "Create a new file.",
       "",
-      "The result will be native, editable Figma objects with real text, auto-layout, and proper colours.",
+      "### CRITICAL RULES — Follow ALL of these:",
       "",
-      "If `use_figma` is not available, call the Layout MCP `check-setup` tool with `fix: true` to auto-configure the Figma MCP server.",
-      "The Figma MCP server must be the official HTTP server at https://mcp.figma.com/mcp (not the old npm package).",
+      "**1. Design system compliance (THIS IS THE WHOLE POINT):**",
+      "- You MUST use the exact colour hex values from the tokens above — NEVER use generic black (#000), white (#FFF), or grey",
+      "- Primary/CTA buttons: use the primary colour token for fill, on-primary token for text",
+      "- Secondary buttons: use outline style with primary colour border",
+      "- Backgrounds: use surface/background tokens for page and card fills",
+      "- Text: use on-surface token for headings, on-surface-variant token for body/secondary text",
+      "- Borders: use outline-variant token for card borders and dividers",
+      "- Border radius: use the exact radius tokens, not arbitrary values",
+      "- Spacing (padding, gap): use the exact spacing tokens, not round numbers",
+      "- Font family: use the typography token font-family, not system defaults",
+      "- Shadows: use the elevation/shadow tokens if defined",
+      "",
+      "**2. Auto-layout (MUST GET RIGHT):**",
+      "- NEVER set fixed heights on content containers — always use Hug for height",
+      "- Card widths in a row: use FILL so they share space equally",
+      "- Card heights: HUG to fit content",
+      "- Feature/list items: gap should be the smallest spacing token (4-8px)",
+      "- Section spacing: use larger spacing tokens (24-48px) between major sections",
+      "- Root frame: set explicit width (e.g. 1440px for desktop), height HUG",
+      "- Badges/tags: HUG both axes, padding 4-8px horizontal, 2-4px vertical",
+      "- NEVER leave sizing unset — every frame must have explicit FILL or HUG on both axes",
+      "",
+      "**3. Visual hierarchy:**",
+      "- Featured/highlighted tier: use primary colour fill or thicker border to distinguish it",
+      "- CTA buttons should differ per tier: outlined for basic, filled primary for featured, filled secondary for enterprise",
+      "- Price should be the largest text in each card (use heading font size)",
+      "- Eyebrow/label text: smaller size, uppercase, wider letter-spacing, primary colour",
+      "- Dividers: use outline-variant colour, 1px height",
+      "",
+      "**4. Content:**",
+      "- ALL text must be realistic — real prices, real feature names, real CTAs",
+      "- No placeholder or lorem ipsum text",
+      "- Use the typography scale: display > heading > title > body > label sizes",
+      "",
+      "**5. Responsive (when multiple viewports requested):**",
+      "- Desktop: horizontal card layout (row)",
+      "- Tablet: horizontal with reduced padding/gap",
+      "- Mobile: stack cards vertically, reduce font sizes, reduce padding",
+      "",
+      "**6. Token format — resolve before calling use_figma:**",
+      "- Convert CSS variables to actual values: --color-primary: #0a4b19 → use #0a4b19",
+      "- Convert spacing: --space-4: 16px → use 16",
+      "- Convert radius: --radius-md: 12px → use 12",
+      "- Do NOT pass CSS variable names to use_figma — only resolved values",
+      "",
+      "If `use_figma` is not available, call Layout MCP's `check-setup` with `fix: true`.",
     ]
       .filter(Boolean)
       .join("\n");
@@ -196,18 +233,26 @@ function extractTokensByCategory(
 ): string {
   if (!kit.tokensCss) return "";
 
-  const lines = kit.tokensCss
+  const tokens = kit.tokensCss
     .split("\n")
     .filter((line) => {
       if (!line.includes("--")) return false;
       const lower = line.toLowerCase();
       return keywords.some((kw) => lower.includes(kw));
     })
+    .map((line) => {
+      const match = line.match(/--([\w-]+)\s*:\s*(.+?)\s*;?\s*$/);
+      if (!match) return null;
+      const name = match[1]!;
+      const value = match[2]!.replace(/;$/, "").trim();
+      return `- **${name}**: \`${value}\``;
+    })
+    .filter(Boolean)
     .slice(0, 40);
 
-  if (lines.length === 0) return "";
+  if (tokens.length === 0) return "";
 
-  return "```css\n" + lines.join("\n") + "\n```";
+  return tokens.join("\n");
 }
 
 /**
