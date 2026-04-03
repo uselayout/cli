@@ -5,7 +5,7 @@ import { loadKit } from "../kit/loader.js";
 import type { Kit } from "../kit/types.js";
 import { startPreviewServer } from "../preview/server.js";
 import { setPreviewServer } from "../preview/ensure.js";
-import { checkMcpRegistration, addFigmaMcpServer } from "../cli/setup-utils.js";
+import { checkMcpRegistration, addFigmaMcpServer, fixGlobalClaudeJson } from "../cli/setup-utils.js";
 
 const require = createRequire(import.meta.url);
 // Resolves from dist/src/mcp/server.js → ../../../package.json
@@ -54,6 +54,14 @@ export async function startServer(): Promise<void> {
 
   // Auto-check Figma MCP setup and fix common issues
   try {
+    // First check ~/.claude.json for old figma-developer-mcp npm package
+    const fixedGlobal = fixGlobalClaudeJson();
+    if (fixedGlobal) {
+      console.error("[layout-context] Figma MCP: replaced outdated figma-developer-mcp in ~/.claude.json with official server");
+      console.error("[layout-context] Figma MCP: restart your agent to activate");
+    }
+
+    // Then check claude mcp list registration
     const mcpState = checkMcpRegistration();
     if (mcpState) {
       if (!mcpState.figma.registered) {
@@ -64,7 +72,7 @@ export async function startServer(): Promise<void> {
           console.error("[layout-context] Figma MCP: restart your agent to activate");
         }
       } else if (!mcpState.figma.correctTransport) {
-        console.error("[layout-context] Figma MCP: wrong transport (needs HTTP, not stdio) — fixing...");
+        console.error("[layout-context] Figma MCP: wrong transport (needs HTTP, not stdio) — replacing with official server...");
         const result = addFigmaMcpServer();
         console.error(`[layout-context] Figma MCP: ${result.message}`);
         if (result.success) {

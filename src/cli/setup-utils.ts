@@ -284,6 +284,49 @@ export function addPlaywrightMcpServer(): FixResult {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Check .claude.json for old Figma entries                           */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Check ~/.claude.json for an outdated figma-developer-mcp entry that
+ * shadows the correct HTTP registration. Returns true if fixed.
+ */
+export function fixGlobalClaudeJson(): boolean {
+  const { readFileSync, writeFileSync } = require("node:fs") as typeof import("node:fs");
+  const { homedir } = require("node:os") as typeof import("node:os");
+  const { join } = require("node:path") as typeof import("node:path");
+
+  const configPath = join(homedir(), ".claude.json");
+
+  try {
+    const raw = readFileSync(configPath, "utf-8");
+    const config = JSON.parse(raw) as Record<string, unknown>;
+    const servers = config.mcpServers as Record<string, Record<string, unknown>> | undefined;
+    if (!servers?.figma) return false;
+
+    const figma = servers.figma;
+    const isOldNpm =
+      figma.type === "stdio" ||
+      (figma.command === "npx" &&
+        Array.isArray(figma.args) &&
+        (figma.args as string[]).some((a: string) => a.includes("figma-developer-mcp")));
+
+    if (!isOldNpm) return false;
+
+    // Replace with official HTTP server
+    servers.figma = {
+      type: "http",
+      url: "https://mcp.figma.com/mcp",
+    };
+
+    writeFileSync(configPath, JSON.stringify(config, null, 2), "utf-8");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /*  Endpoint reachability                                              */
 /* ------------------------------------------------------------------ */
 
