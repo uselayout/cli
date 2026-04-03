@@ -26,6 +26,8 @@ export interface McpRegistrationState {
     correctTransport: boolean;
     /** True if registered at user scope */
     correctScope: boolean;
+    /** True if using the old figma-developer-mcp npm package (stdio, only 2 tools) */
+    isOldNpmPackage?: boolean;
   };
   /** Playwright state */
   playwright: {
@@ -82,6 +84,9 @@ export function checkMcpRegistration(): McpRegistrationState | null {
     (s) => s.name === "layout" || s.name === "layoutdesign"
   );
 
+  // Detect old figma-developer-mcp npm package (only has 2 tools, uses stdio)
+  const isOldNpmPackage = figmaEntry?.transport === "stdio" && !hasPluginShadow;
+
   return {
     rawOutput,
     servers,
@@ -91,6 +96,7 @@ export function checkMcpRegistration(): McpRegistrationState | null {
       pluginShadow: hasPluginShadow,
       correctTransport: figmaEntry?.transport === "http",
       correctScope: figmaEntry?.scope === "user",
+      isOldNpmPackage,
     },
     playwright: {
       registered: !!playwrightEntry,
@@ -187,6 +193,15 @@ function parseMcpList(raw: string): McpServerEntry[] {
  * sessions, so we must ensure a proper user-scoped entry exists.
  */
 export function addFigmaMcpServer(): FixResult {
+  // First, remove any existing figma entry (may be the old npm package)
+  try {
+    execFileSync("claude", ["mcp", "remove", "figma"], {
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+  } catch {
+    // Ignore — may not exist
+  }
+
   try {
     execFileSync(
       "claude",
@@ -199,7 +214,7 @@ export function addFigmaMcpServer(): FixResult {
     return {
       server: "figma",
       success: true,
-      message: "Registered globally (OAuth — authenticate once in Claude Code)",
+      message: "Registered official Figma MCP (OAuth — authenticate once in Claude Code)",
     };
   } catch (err) {
     const stderr = (err as { stderr?: Buffer }).stderr?.toString() ?? "";

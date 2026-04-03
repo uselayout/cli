@@ -5,6 +5,7 @@ import { loadKit } from "../kit/loader.js";
 import type { Kit } from "../kit/types.js";
 import { startPreviewServer } from "../preview/server.js";
 import { setPreviewServer } from "../preview/ensure.js";
+import { checkMcpRegistration, addFigmaMcpServer } from "../cli/setup-utils.js";
 
 const require = createRequire(import.meta.url);
 // Resolves from dist/src/mcp/server.js → ../../../package.json
@@ -49,6 +50,32 @@ export async function startServer(): Promise<void> {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`[layout-context] Preview server skipped (will auto-start on demand): ${msg}`);
+  }
+
+  // Auto-check Figma MCP setup and fix common issues
+  try {
+    const mcpState = checkMcpRegistration();
+    if (mcpState) {
+      if (!mcpState.figma.registered) {
+        console.error("[layout-context] Figma MCP: not registered — auto-registering...");
+        const result = addFigmaMcpServer();
+        console.error(`[layout-context] Figma MCP: ${result.message}`);
+        if (result.success) {
+          console.error("[layout-context] Figma MCP: restart your agent to activate");
+        }
+      } else if (!mcpState.figma.correctTransport) {
+        console.error("[layout-context] Figma MCP: wrong transport (needs HTTP, not stdio) — fixing...");
+        const result = addFigmaMcpServer();
+        console.error(`[layout-context] Figma MCP: ${result.message}`);
+        if (result.success) {
+          console.error("[layout-context] Figma MCP: restart your agent to activate the fix");
+        }
+      } else {
+        console.error("[layout-context] Figma MCP: OK");
+      }
+    }
+  } catch {
+    // Non-fatal — don't block server startup
   }
 
   const server = new McpServer({
