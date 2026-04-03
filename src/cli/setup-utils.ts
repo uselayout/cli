@@ -193,13 +193,15 @@ function parseMcpList(raw: string): McpServerEntry[] {
  * sessions, so we must ensure a proper user-scoped entry exists.
  */
 export function addFigmaMcpServer(): FixResult {
-  // First, remove any existing figma entry (may be the old npm package)
-  try {
-    execFileSync("claude", ["mcp", "remove", "figma"], {
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-  } catch {
-    // Ignore — may not exist
+  // Remove any existing figma entries at all scopes (may be old npm package or wrong scope)
+  for (const scope of ["user", "project", "local"]) {
+    try {
+      execFileSync("claude", ["mcp", "remove", "--scope", scope, "figma"], {
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+    } catch {
+      // Ignore — may not exist at this scope
+    }
   }
 
   try {

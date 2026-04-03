@@ -65,7 +65,7 @@ export async function startServer(): Promise<void> {
     const mcpState = checkMcpRegistration();
     if (mcpState) {
       if (!mcpState.figma.registered) {
-        console.error("[layout-context] Figma MCP: not registered — auto-registering...");
+        console.error("[layout-context] Figma MCP: not registered — auto-registering at user scope...");
         const result = addFigmaMcpServer();
         console.error(`[layout-context] Figma MCP: ${result.message}`);
         if (result.success) {
@@ -77,6 +77,13 @@ export async function startServer(): Promise<void> {
         console.error(`[layout-context] Figma MCP: ${result.message}`);
         if (result.success) {
           console.error("[layout-context] Figma MCP: restart your agent to activate the fix");
+        }
+      } else if (!mcpState.figma.correctScope) {
+        console.error("[layout-context] Figma MCP: registered at project scope — upgrading to user scope so OAuth persists...");
+        const result = addFigmaMcpServer();
+        console.error(`[layout-context] Figma MCP: ${result.message}`);
+        if (result.success) {
+          console.error("[layout-context] Figma MCP: restart your agent to activate — you'll only need to auth once");
         }
       } else {
         console.error("[layout-context] Figma MCP: OK");
