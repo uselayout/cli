@@ -259,6 +259,8 @@ function buildNativeResponse({
     "- Recreate the layout using Figma auto-layout (not absolute positioning)",
     "- Use the exact colours, fonts, spacing, and radius from the code/tokens",
     "- Create real text nodes with correct content, font, and size",
+    "- NEVER use fixed pixel widths/heights on auto-layout children — use FILL or HUG",
+    "- NEVER leave padding or gap at 0 — use spacing values from the code (e.g. gap-4 = 16px padding, p-6 = 24px)",
     "- Create a frame for each viewport listed above, adapting the layout responsively",
     "",
     variants && variants.length > 0
