@@ -25,6 +25,7 @@ import * as updateTokens from "./tools/update-tokens.js";
 import * as getScreenshots from "./tools/get-screenshots.js";
 import * as checkSetup from "./tools/check-setup.js";
 import * as pushTokensToFigma from "./tools/push-tokens-to-figma.js";
+import * as scanProject from "./tools/scan-project.js";
 
 /**
  * Start the Layout Context MCP server.
@@ -110,7 +111,7 @@ export async function startServer(): Promise<void> {
     version: pkg.version,
   });
 
-  // Register all 12 tools
+  // Register all 14 tools
   server.tool(
     getDesignSystem.name,
     getDesignSystem.description,
@@ -200,6 +201,13 @@ export async function startServer(): Promise<void> {
     pushTokensToFigma.description,
     pushTokensToFigma.inputSchema,
     pushTokensToFigma.handler(kit)
+  );
+
+  server.tool(
+    scanProject.name,
+    scanProject.description,
+    scanProject.inputSchema,
+    scanProject.handler()
   );
 
   // Connect via stdio
