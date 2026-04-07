@@ -18,7 +18,7 @@ interface ScanOptions {
  */
 function readProjectContext(
   rootPath: string
-): { orgId?: string; projectId?: string } {
+): { orgId?: string; projectId?: string; apiBase?: string } {
   const manifestPath = resolve(rootPath, LAYOUT_DIR, "kit.json");
   if (!existsSync(manifestPath)) return {};
 
@@ -27,7 +27,7 @@ function readProjectContext(
 
     // Check explicit fields first
     if (manifest.orgId && manifest.projectId) {
-      return { orgId: manifest.orgId, projectId: manifest.projectId };
+      return { orgId: manifest.orgId, projectId: manifest.projectId, apiBase: manifest.apiBase };
     }
 
     // Try to parse from layoutUrl
@@ -158,6 +158,7 @@ async function syncResults(
   const context = readProjectContext(rootPath);
   const orgId = context.orgId;
   const projectId = projectArg ?? context.projectId;
+  const apiBase = (context.apiBase ?? "https://layout.design").replace(/\/$/, "");
 
   if (!orgId || !projectId) {
     console.log(
@@ -170,7 +171,7 @@ async function syncResults(
     return;
   }
 
-  const url = `https://layout.design/api/organizations/${orgId}/projects/${projectId}/scan-results`;
+  const url = `${apiBase}/api/organizations/${orgId}/projects/${projectId}/scan-results`;
 
   console.log(
     chalk.dim(`  Syncing to ${url}...`)
@@ -181,11 +182,19 @@ async function syncResults(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        components: result.components,
-        storybookStories: result.storybookStories,
-        unmatchedStories: result.unmatchedStories,
-        filesScanned: result.filesScanned,
-        durationMs: result.durationMs,
+        components: result.components.map((c) => ({
+          name: c.name,
+          filePath: c.filePath,
+          exportType: c.exportType,
+          propsType: c.propsInterfaceName,
+          props: c.props.map((p) => p.name),
+          usesForwardRef: c.usesForwardRef,
+          importPath: c.filePath.replace(/\.(tsx?|jsx?)$/, "").replace(/\/index$/, ""),
+          source: c.storybook ? "storybook" as const : "codebase" as const,
+          stories: c.storybook?.stories.map((s) => s.name),
+          args: c.storybook?.args,
+        })),
+        source: "cli",
       }),
     });
 
