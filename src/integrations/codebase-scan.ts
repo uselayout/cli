@@ -85,6 +85,10 @@ const DEFAULT_FUNCTION_RE =
 const FORWARD_REF_RE =
   /export\s+const\s+([A-Z]\w+)\s*=\s*(?:React\.)?forwardRef/g;
 
+// Grouped export: `export { Button, Card, buttonVariants }` — capture PascalCase names only
+const GROUPED_EXPORT_RE =
+  /export\s*\{([^}]+)\}/g;
+
 // Props interface: `interface ButtonProps {` or `type ButtonProps = {`
 const PROPS_INTERFACE_RE =
   /(?:interface|type)\s+(\w+Props)\s*(?:=\s*)?\{([\s\S]*?)\n\}/g;
@@ -201,6 +205,18 @@ function extractComponents(
   FORWARD_REF_RE.lastIndex = 0;
   while ((match = FORWARD_REF_RE.exec(content)) !== null) {
     addComponent(match[1]!, "named", true);
+  }
+
+  // Grouped exports: `export { Button, Card, buttonVariants }`
+  // Only pick PascalCase names (components), skip camelCase (utilities)
+  GROUPED_EXPORT_RE.lastIndex = 0;
+  while ((match = GROUPED_EXPORT_RE.exec(content)) !== null) {
+    const names = match[1]!.split(",").map((n) => n.trim().split(/\s+as\s+/).pop()!.trim());
+    for (const name of names) {
+      if (/^[A-Z][a-zA-Z0-9]+$/.test(name)) {
+        addComponent(name, "named", false);
+      }
+    }
   }
 
   return components;
