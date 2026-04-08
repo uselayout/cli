@@ -10,6 +10,7 @@ import { listCommand } from "../src/cli/list.js";
 import { installCommand } from "../src/cli/install.js";
 import { doctorCommand } from "../src/cli/doctor.js";
 import { serveLocalCommand } from "../src/cli/serve-local.js";
+import { scanCommand } from "../src/cli/scan.js";
 
 const require = createRequire(import.meta.url);
 const pkg = require("../../package.json") as { version: string };
@@ -88,6 +89,16 @@ program
   .option("--verbose", "Show detailed diagnostic output including raw MCP server data")
   .action(async (options: { fix?: boolean; verbose?: boolean }) => {
     await doctorCommand(options);
+  });
+
+program
+  .command("scan [path]")
+  .description("Scan the codebase for React components and Storybook stories")
+  .option("--sync", "Upload results to your Layout project")
+  .option("--project <id>", "Layout project ID (auto-detected from .layout/ if not specified)")
+  .option("--type <type>", "Scan type: storybook, codebase, or both (default: both)")
+  .action(async (targetPath?: string, options?: { sync?: boolean; project?: string; type?: string }) => {
+    await scanCommand(targetPath, options);
   });
 
 program.parse();

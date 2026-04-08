@@ -3,8 +3,11 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { loadKit } from "../kit/loader.js";
 import type { Kit } from "../kit/types.js";
+import { scanCodebase } from "../integrations/codebase-scan.js";
+import type { ScanResult } from "../integrations/codebase-scan.js";
 import { startPreviewServer } from "../preview/server.js";
 import { setPreviewServer } from "../preview/ensure.js";
+import { checkMcpRegistration, addFigmaMcpServer, addPlaywrightMcpServer, fixGlobalClaudeJson } from "../cli/setup-utils.js";
 
 const require = createRequire(import.meta.url);
 // Resolves from dist/src/mcp/server.js → ../../../package.json
@@ -23,6 +26,8 @@ import * as designInFigma from "./tools/design-in-figma.js";
 import * as updateTokens from "./tools/update-tokens.js";
 import * as getScreenshots from "./tools/get-screenshots.js";
 import * as checkSetup from "./tools/check-setup.js";
+import * as pushTokensToFigma from "./tools/push-tokens-to-figma.js";
+import * as scanProject from "./tools/scan-project.js";
 
 /**
  * Start the Layout Context MCP server.
@@ -30,6 +35,20 @@ import * as checkSetup from "./tools/check-setup.js";
  */
 export async function startServer(): Promise<void> {
   const kit: Kit | null = loadKit();
+
+  // Auto-scan current directory for React components and Storybook stories
+  let scanResult: ScanResult | null = null;
+  try {
+    scanResult = await scanCodebase(process.cwd());
+    if (scanResult.components.length > 0) {
+      console.error(
+        `[layout-context] Codebase: ${scanResult.components.length} components` +
+        (scanResult.storybookStories.length > 0 ? ` (${scanResult.storybookStories.length} stories)` : "")
+      );
+    }
+  } catch {
+    // Non-fatal — continue without codebase scan
+  }
 
   const kitName = kit?.manifest.displayName ?? "none";
   const componentCount = kit?.components.length ?? 0;
@@ -50,12 +69,65 @@ export async function startServer(): Promise<void> {
     console.error(`[layout-context] Preview server skipped (will auto-start on demand): ${msg}`);
   }
 
+  // Auto-check Figma MCP setup and fix common issues
+  try {
+    // First check ~/.claude.json for old figma-developer-mcp npm package
+    const fixedGlobal = fixGlobalClaudeJson();
+    if (fixedGlobal) {
+      console.error("[layout-context] Figma MCP: replaced outdated figma-developer-mcp in ~/.claude.json with official server");
+      console.error("[layout-context] Figma MCP: restart your agent to activate");
+    }
+
+    // Then check claude mcp list registration
+    const mcpState = checkMcpRegistration();
+    if (mcpState) {
+      if (!mcpState.figma.registered) {
+        console.error("[layout-context] Figma MCP: not registered — auto-registering at user scope...");
+        const result = addFigmaMcpServer();
+        console.error(`[layout-context] Figma MCP: ${result.message}`);
+        if (result.success) {
+          console.error("[layout-context] Figma MCP: restart your agent to activate");
+        }
+      } else if (!mcpState.figma.correctTransport) {
+        console.error("[layout-context] Figma MCP: wrong transport (needs HTTP, not stdio) — replacing with official server...");
+        const result = addFigmaMcpServer();
+        console.error(`[layout-context] Figma MCP: ${result.message}`);
+        if (result.success) {
+          console.error("[layout-context] Figma MCP: restart your agent to activate the fix");
+        }
+      } else if (!mcpState.figma.correctScope) {
+        console.error("[layout-context] Figma MCP: registered at project scope — upgrading to user scope so OAuth persists...");
+        const result = addFigmaMcpServer();
+        console.error(`[layout-context] Figma MCP: ${result.message}`);
+        if (result.success) {
+          console.error("[layout-context] Figma MCP: restart your agent to activate — you'll only need to auth once");
+        }
+      } else {
+        console.error("[layout-context] Figma MCP: OK");
+      }
+
+      // Check Playwright MCP (needed for capture mode and url-to-figma)
+      if (!mcpState.playwright.registered) {
+        console.error("[layout-context] Playwright MCP: not registered — auto-registering...");
+        const result = addPlaywrightMcpServer();
+        console.error(`[layout-context] Playwright MCP: ${result.message}`);
+        if (result.success) {
+          console.error("[layout-context] Playwright MCP: restart your agent to activate");
+        }
+      } else {
+        console.error("[layout-context] Playwright MCP: OK");
+      }
+    }
+  } catch {
+    // Non-fatal — don't block server startup
+  }
+
   const server = new McpServer({
     name: "layout-context",
     version: pkg.version,
   });
 
-  // Register all 12 tools
+  // Register all 14 tools
   server.tool(
     getDesignSystem.name,
     getDesignSystem.description,
@@ -81,7 +153,7 @@ export async function startServer(): Promise<void> {
     listComponents.name,
     listComponents.description,
     listComponents.inputSchema,
-    listComponents.handler(kit)
+    listComponents.handler(kit, scanResult)
   );
 
   server.tool(
@@ -138,6 +210,20 @@ export async function startServer(): Promise<void> {
     checkSetup.description,
     checkSetup.inputSchema,
     checkSetup.handler()
+  );
+
+  server.tool(
+    pushTokensToFigma.name,
+    pushTokensToFigma.description,
+    pushTokensToFigma.inputSchema,
+    pushTokensToFigma.handler(kit)
+  );
+
+  server.tool(
+    scanProject.name,
+    scanProject.description,
+    scanProject.inputSchema,
+    scanProject.handler()
   );
 
   // Connect via stdio

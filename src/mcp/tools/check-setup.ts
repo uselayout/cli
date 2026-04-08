@@ -86,8 +86,16 @@ async function checkFigma(
     const entry = state.figma.entry;
     const issues: string[] = [];
 
+    // Check for old npm package
+    if (state.figma.isOldNpmPackage) {
+      issues.push(
+        "- **Outdated Figma MCP:** You have the old `figma-developer-mcp` npm package (only 2 tools: get_figma_data, download_figma_images). " +
+          "Layout requires the official Figma MCP server at `mcp.figma.com` which has 16 tools including `use_figma`"
+      );
+    }
+
     // Check transport
-    if (!state.figma.correctTransport) {
+    if (!state.figma.correctTransport && !state.figma.isOldNpmPackage) {
       issues.push(
         `- **Wrong transport:** Using \`${entry?.transport ?? "unknown"}\` but Figma MCP requires \`http\` transport for OAuth`
       );

@@ -40,6 +40,14 @@ export const inputSchema = {
       "'Assemble Component Set' to combine them into a proper Figma component with variant properties. " +
       "Tip: render hover states by applying hover styles directly as classes, not via CSS :hover pseudo-class."
     ),
+  mode: z
+    .enum(["capture", "native"])
+    .optional()
+    .describe(
+      "Push mode. 'capture' (default) renders in browser and captures as flat frames via Playwright. " +
+      "'native' uses Figma MCP's use_figma to create editable Figma objects with auto-layout and real text. " +
+      "Native mode does not require Playwright MCP."
+    ),
 };
 
 const VIEWPORT_DIMS = {
@@ -158,6 +166,116 @@ function buildCaptureInstructions(
   ].join("\n");
 }
 
+function buildNativeResponse({
+  code,
+  frameName,
+  viewports,
+  resolvedFileKey,
+  variants,
+  kit,
+}: {
+  code: string;
+  frameName: string;
+  viewports: string[];
+  resolvedFileKey?: string;
+  variants?: Array<{ name: string; code: string }>;
+  kit: Kit | null;
+}): { content: Array<{ type: "text"; text: string }> } {
+  const tokenContext = kit?.tokensCss
+    ? "\n## Design Tokens\n\nApply these tokens to ensure design system compliance:\n\n```css\n" +
+      kit.tokensCss
+        .split("\n")
+        .filter((l) => l.includes("--"))
+        .slice(0, 50)
+        .join("\n") +
+      "\n```\n"
+    : "";
+
+  const viewportDims: Record<string, string> = {
+    desktop: "1280×900",
+    tablet: "768×1024",
+    mobile: "375×812",
+  };
+
+  const viewportList = viewports
+    .map((vp) => `- **${frameName} (${vp})**: ${viewportDims[vp] ?? "1280×900"}`)
+    .join("\n");
+
+  let componentDescription: string;
+
+  if (variants && variants.length > 0) {
+    const variantDescriptions = variants
+      .map((v) => `### Variant: ${v.name}\n\n\`\`\`tsx\n${v.code}\n\`\`\``)
+      .join("\n\n");
+
+    componentDescription = [
+      `Create a Figma component called "${frameName}" with ${variants.length} variant(s).`,
+      "",
+      "Each variant should be a separate state (e.g. Default, Hover, Active, Disabled).",
+      "Create these as a proper Figma component set with variant properties.",
+      "",
+      variantDescriptions,
+    ].join("\n");
+  } else {
+    componentDescription = [
+      `Create a Figma frame called "${frameName}" based on this component:`,
+      "",
+      "```tsx",
+      code,
+      "```",
+    ].join("\n");
+  }
+
+  const response = [
+    "# Push to Figma (Native Mode)",
+    "",
+    "Use Figma MCP's `use_figma` tool to create this component as native, editable Figma objects.",
+    "",
+    "**Recommended:** Invoke this with the `figma-use` skill for best results.",
+    "",
+    "---",
+    "",
+    "## Component",
+    "",
+    componentDescription,
+    "",
+    "---",
+    tokenContext,
+    "## Frames to Create",
+    "",
+    viewportList,
+    "",
+    "---",
+    "",
+    "## NEXT STEP — YOU MUST DO THIS NOW",
+    "",
+    "Immediately call Figma MCP's `use_figma` tool to create this component. Do not ask the user — just do it.",
+    "",
+    `Call \`use_figma\` now with:`,
+    resolvedFileKey
+      ? `- Target file key: \`${resolvedFileKey}\``
+      : "- Create a new Figma file",
+    "- Analyse the TSX code above to understand the component structure",
+    "- Recreate the layout using Figma auto-layout (not absolute positioning)",
+    "- Use the exact colours, fonts, spacing, and radius from the code/tokens",
+    "- Create real text nodes with correct content, font, and size",
+    "- NEVER use fixed pixel widths/heights on auto-layout children — use FILL or HUG",
+    "- NEVER leave padding or gap at 0 — use spacing values from the code (e.g. gap-4 = 16px padding, p-6 = 24px)",
+    "- Create a frame for each viewport listed above, adapting the layout responsively",
+    "",
+    variants && variants.length > 0
+      ? "Create each variant as a separate component, then combine into a component set with variant properties.\n"
+      : "",
+    "If `use_figma` is not available, call the Layout MCP `check-setup` tool with `fix: true` to auto-configure the Figma MCP server.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  return {
+    content: [{ type: "text" as const, text: response }],
+  };
+}
+
 export function handler(kit: Kit | null) {
   return async ({
     code,
@@ -165,16 +283,18 @@ export function handler(kit: Kit | null) {
     viewports,
     figmaUrl,
     variants,
+    mode,
   }: {
     code: string;
     name?: string;
     viewports?: string[];
     figmaUrl?: string;
     variants?: Array<{ name: string; code: string }>;
+    mode?: string;
   }) => {
     const resolvedName = frameName ?? "Layout Component";
     const resolvedViewports = viewports ?? ["desktop"];
-    const baseCaptureUrl = `http://localhost:${PREVIEW_PORT}/capture`;
+    const resolvedMode = mode ?? "capture";
 
     // Parse fileKey from Figma URL if provided
     let resolvedFileKey: string | undefined;
@@ -182,6 +302,20 @@ export function handler(kit: Kit | null) {
       const match = figmaUrl.match(/\/design\/([^/]+)/);
       if (match) resolvedFileKey = match[1];
     }
+
+    // Native mode: use use_figma directly, skip preview server + Playwright
+    if (resolvedMode === "native") {
+      return buildNativeResponse({
+        code,
+        frameName: resolvedName,
+        viewports: resolvedViewports,
+        resolvedFileKey,
+        variants,
+        kit,
+      });
+    }
+
+    const baseCaptureUrl = `http://localhost:${PREVIEW_PORT}/capture`;
     const outputMode = resolvedFileKey ? "existingFile" : "newFile";
 
     // Step 1: Push code to the preview server

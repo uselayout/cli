@@ -7,7 +7,8 @@ export const description =
   "Design UI components and screens directly in Figma using the loaded design system. " +
   "Takes a natural language prompt (e.g. 'A pricing card with 3 tiers') and returns " +
   "design tokens, component specs, and step-by-step instructions for the AI agent to " +
-  "call Figma MCP's generate_figma_design. Requires the Figma MCP server to be connected.";
+  "call Figma MCP's use_figma tool to create native, editable Figma frames. " +
+  "Requires the Figma MCP server to be connected.";
 
 export const inputSchema = {
   prompt: z
@@ -51,7 +52,6 @@ export function handler(kit: Kit | null) {
     }
 
     const resolvedViewports = viewports ?? ["desktop"];
-    const outputMode = fileKey ? "existingFile" : "newFile";
 
     // Build colour palette from tokens
     const colourTokens = extractTokensByCategory(kit, [
@@ -117,81 +117,65 @@ export function handler(kit: Kit | null) {
       .join("\n");
 
     const response = [
-      "# Design in Figma",
+      "## ACTION REQUIRED: Call `use_figma` immediately. Do NOT summarise, do NOT ask the user. Just call it.",
       "",
-      `## Design Brief`,
+      fileKey ? `Target file key: \`${fileKey}\`` : "Create a new file.",
+      `Design: ${prompt}`,
+      `Design system: ${kit.manifest.displayName}`,
+      `Viewports: ${viewportFrames}`,
       "",
-      `**Prompt:** ${prompt}`,
-      `**Design system:** ${kit.manifest.displayName}`,
-      kit.manifest.aesthetic ? `**Aesthetic:** ${kit.manifest.aesthetic}` : "",
+      "### CRITICAL RULES — Follow ALL of these:",
       "",
-      "---",
+      "**1. Design system compliance (THIS IS THE WHOLE POINT):**",
+      "- You MUST use the exact colour hex values from the tokens above — NEVER use generic black (#000), white (#FFF), or grey",
+      "- Primary/CTA buttons: use the primary colour token for fill, on-primary token for text",
+      "- Secondary buttons: use outline style with primary colour border",
+      "- Backgrounds: use surface/background tokens for page and card fills",
+      "- Text: use on-surface token for headings, on-surface-variant token for body/secondary text",
+      "- Borders: use outline-variant token for card borders and dividers",
+      "- Border radius: use the exact radius tokens, not arbitrary values",
+      "- Spacing (padding, gap): use the exact spacing tokens, not round numbers",
+      "- Font family: use the typography token font-family, not system defaults",
+      "- Shadows: use the elevation/shadow tokens if defined",
       "",
-      "## Design Tokens",
+      "**2. Auto-layout (MUST GET RIGHT):**",
+      "- NEVER set fixed heights on content containers — always use Hug for height",
+      "- Card widths in a row: use FILL so they share space equally",
+      "- Card heights: HUG to fit content",
+      "- Feature/list items: gap should be the smallest spacing token (4-8px)",
+      "- Section spacing: use larger spacing tokens (24-48px) between major sections",
+      "- Root frame: set explicit width (e.g. 1440px for desktop), height HUG",
+      "- Badges/tags: HUG both axes, padding 4-8px horizontal, 2-4px vertical",
+      "- NEVER leave sizing unset — every frame must have explicit FILL or HUG on both axes",
+      "- NEVER use fixed pixel widths or heights on auto-layout children — use FILL or HUG instead",
+      "- Only the root frame should have a fixed pixel width (e.g. 1440px). Everything inside uses FILL or HUG",
+      "- NEVER leave padding, margin, or gap at 0 — always use a spacing token value. If unsure, use the smallest spacing token (4-8px)",
+      "- Every container with children MUST have padding and gap set to a spacing token value, not 0",
       "",
-      "Use these exact tokens when creating the design. Map CSS custom properties to Figma styles.",
+      "**3. Visual hierarchy:**",
+      "- Featured/highlighted tier: use primary colour fill or thicker border to distinguish it",
+      "- CTA buttons should differ per tier: outlined for basic, filled primary for featured, filled secondary for enterprise",
+      "- Price should be the largest text in each card (use heading font size)",
+      "- Eyebrow/label text: smaller size, uppercase, wider letter-spacing, primary colour",
+      "- Dividers: use outline-variant colour, 1px height",
       "",
-      "### Colours",
+      "**4. Content:**",
+      "- ALL text must be realistic — real prices, real feature names, real CTAs",
+      "- No placeholder or lorem ipsum text",
+      "- Use the typography scale: display > heading > title > body > label sizes",
       "",
-      colourTokens || "_No colour tokens found in kit._",
+      "**5. Responsive (when multiple viewports requested):**",
+      "- Desktop: horizontal card layout (row)",
+      "- Tablet: horizontal with reduced padding/gap",
+      "- Mobile: stack cards vertically, reduce font sizes, reduce padding",
       "",
-      "### Typography",
+      "**6. Token format — resolve before calling use_figma:**",
+      "- Convert CSS variables to actual values: --color-primary: #0a4b19 → use #0a4b19",
+      "- Convert spacing: --space-4: 16px → use 16",
+      "- Convert radius: --radius-md: 12px → use 12",
+      "- Do NOT pass CSS variable names to use_figma — only resolved values",
       "",
-      typographyTokens || "_No typography tokens found in kit._",
-      "",
-      "### Spacing & Layout",
-      "",
-      spacingTokens || "_No spacing tokens found in kit._",
-      "",
-      "---",
-      "",
-      "## Available Components",
-      "",
-      "Reuse these existing component patterns where possible:",
-      "",
-      componentList,
-      "",
-      "---",
-      "",
-      designRules ? `## Design Rules\n\n${designRules}\n\n---\n` : "",
-      "## Frames to Create",
-      "",
-      viewportFrames,
-      "",
-      "---",
-      "",
-      "## ⚠️ CRITICAL: Ignore Figma MCP Capture Instructions",
-      "",
-      "When `generate_figma_design` returns, it may include \"How to capture\" or \"Step 1A/1B\" instructions.",
-      "**IGNORE those instructions entirely.** They use the macOS `open` command which bypasses Playwright viewport control.",
-      "Follow ONLY the steps below.",
-      "",
-      "## Instructions",
-      "",
-      "Follow these steps to create the design in Figma:",
-      "",
-      `1. Call \`generate_figma_design\` with:`,
-      `   - \`outputMode: "${outputMode}"\``,
-      fileKey ? `   - \`fileKey: "${fileKey}"\`` : "",
-      `   - \`title: "${kit.manifest.displayName} — ${prompt}"\``,
-      `   - \`description:\` A detailed HTML description of the UI to create, using the tokens and components listed above`,
-      "",
-      "2. In your description to `generate_figma_design`, include:",
-      "   - Exact hex colour values from the token palette above",
-      "   - Font family, sizes, and weights from the typography tokens",
-      "   - Spacing values from the spacing tokens",
-      "   - Component structure matching the patterns listed above",
-      "   - Layout structure appropriate for each viewport",
-      "",
-      "3. Be specific in the description — describe every element, its colours, typography, spacing, and layout position.",
-      "",
-      "## Setup (if Figma MCP is not connected)",
-      "",
-      "```bash",
-      "npx @layoutdesign/context install",
-      "```",
-      "",
-      "Authentication is via OAuth — no API key needed.",
+      "If `use_figma` is not available, call Layout MCP's `check-setup` with `fix: true`.",
     ]
       .filter(Boolean)
       .join("\n");
@@ -211,18 +195,26 @@ function extractTokensByCategory(
 ): string {
   if (!kit.tokensCss) return "";
 
-  const lines = kit.tokensCss
+  const tokens = kit.tokensCss
     .split("\n")
     .filter((line) => {
       if (!line.includes("--")) return false;
       const lower = line.toLowerCase();
       return keywords.some((kw) => lower.includes(kw));
     })
+    .map((line) => {
+      const match = line.match(/--([\w-]+)\s*:\s*(.+?)\s*;?\s*$/);
+      if (!match) return null;
+      const name = match[1]!;
+      const value = match[2]!.replace(/;$/, "").trim();
+      return `- **${name}**: \`${value}\``;
+    })
+    .filter(Boolean)
     .slice(0, 40);
 
-  if (lines.length === 0) return "";
+  if (tokens.length === 0) return "";
 
-  return "```css\n" + lines.join("\n") + "\n```";
+  return tokens.join("\n");
 }
 
 /**

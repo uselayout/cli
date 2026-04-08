@@ -26,6 +26,8 @@ export interface McpRegistrationState {
     correctTransport: boolean;
     /** True if registered at user scope */
     correctScope: boolean;
+    /** True if using the old figma-developer-mcp npm package (stdio, only 2 tools) */
+    isOldNpmPackage?: boolean;
   };
   /** Playwright state */
   playwright: {
@@ -82,6 +84,9 @@ export function checkMcpRegistration(): McpRegistrationState | null {
     (s) => s.name === "layout" || s.name === "layoutdesign"
   );
 
+  // Detect old figma-developer-mcp npm package (only has 2 tools, uses stdio)
+  const isOldNpmPackage = figmaEntry?.transport === "stdio" && !hasPluginShadow;
+
   return {
     rawOutput,
     servers,
@@ -91,6 +96,7 @@ export function checkMcpRegistration(): McpRegistrationState | null {
       pluginShadow: hasPluginShadow,
       correctTransport: figmaEntry?.transport === "http",
       correctScope: figmaEntry?.scope === "user",
+      isOldNpmPackage,
     },
     playwright: {
       registered: !!playwrightEntry,
@@ -187,6 +193,17 @@ function parseMcpList(raw: string): McpServerEntry[] {
  * sessions, so we must ensure a proper user-scoped entry exists.
  */
 export function addFigmaMcpServer(): FixResult {
+  // Remove any existing figma entries at all scopes (may be old npm package or wrong scope)
+  for (const scope of ["user", "project", "local"]) {
+    try {
+      execFileSync("claude", ["mcp", "remove", "--scope", scope, "figma"], {
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+    } catch {
+      // Ignore — may not exist at this scope
+    }
+  }
+
   try {
     execFileSync(
       "claude",
@@ -199,7 +216,7 @@ export function addFigmaMcpServer(): FixResult {
     return {
       server: "figma",
       success: true,
-      message: "Registered globally (OAuth — authenticate once in Claude Code)",
+      message: "Registered official Figma MCP (OAuth — authenticate once in Claude Code)",
     };
   } catch (err) {
     const stderr = (err as { stderr?: Buffer }).stderr?.toString() ?? "";
@@ -265,6 +282,49 @@ export function addPlaywrightMcpServer(): FixResult {
       message:
         "Could not register automatically. Run manually: claude mcp add --scope user playwright -- npx -y @anthropic-ai/mcp-playwright",
     };
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Check .claude.json for old Figma entries                           */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Check ~/.claude.json for an outdated figma-developer-mcp entry that
+ * shadows the correct HTTP registration. Returns true if fixed.
+ */
+export function fixGlobalClaudeJson(): boolean {
+  const { readFileSync, writeFileSync } = require("node:fs") as typeof import("node:fs");
+  const { homedir } = require("node:os") as typeof import("node:os");
+  const { join } = require("node:path") as typeof import("node:path");
+
+  const configPath = join(homedir(), ".claude.json");
+
+  try {
+    const raw = readFileSync(configPath, "utf-8");
+    const config = JSON.parse(raw) as Record<string, unknown>;
+    const servers = config.mcpServers as Record<string, Record<string, unknown>> | undefined;
+    if (!servers?.figma) return false;
+
+    const figma = servers.figma;
+    const isOldNpm =
+      figma.type === "stdio" ||
+      (figma.command === "npx" &&
+        Array.isArray(figma.args) &&
+        (figma.args as string[]).some((a: string) => a.includes("figma-developer-mcp")));
+
+    if (!isOldNpm) return false;
+
+    // Replace with official HTTP server
+    servers.figma = {
+      type: "http",
+      url: "https://mcp.figma.com/mcp",
+    };
+
+    writeFileSync(configPath, JSON.stringify(config, null, 2), "utf-8");
+    return true;
+  } catch {
+    return false;
   }
 }
 

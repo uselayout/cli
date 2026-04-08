@@ -1,6 +1,6 @@
 {
   "name": "@layoutdesign/context",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Design system context for AI coding agents — MCP server + CLI + live preview",
   "license": "MIT",
   "type": "module",
