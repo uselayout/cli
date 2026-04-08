@@ -178,9 +178,13 @@ async function syncResults(
   );
 
   try {
+    const apiKey = process.env.LAYOUT_API_KEY;
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
+
     const response = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({
         components: result.components.map((c) => ({
           name: c.name,
