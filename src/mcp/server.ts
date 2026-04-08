@@ -3,6 +3,8 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { loadKit } from "../kit/loader.js";
 import type { Kit } from "../kit/types.js";
+import { scanCodebase } from "../integrations/codebase-scan.js";
+import type { ScanResult } from "../integrations/codebase-scan.js";
 import { startPreviewServer } from "../preview/server.js";
 import { setPreviewServer } from "../preview/ensure.js";
 import { checkMcpRegistration, addFigmaMcpServer, addPlaywrightMcpServer, fixGlobalClaudeJson } from "../cli/setup-utils.js";
@@ -33,6 +35,20 @@ import * as scanProject from "./tools/scan-project.js";
  */
 export async function startServer(): Promise<void> {
   const kit: Kit | null = loadKit();
+
+  // Auto-scan current directory for React components and Storybook stories
+  let scanResult: ScanResult | null = null;
+  try {
+    scanResult = await scanCodebase(process.cwd());
+    if (scanResult.components.length > 0) {
+      console.error(
+        `[layout-context] Codebase: ${scanResult.components.length} components` +
+        (scanResult.storybookStories.length > 0 ? ` (${scanResult.storybookStories.length} stories)` : "")
+      );
+    }
+  } catch {
+    // Non-fatal — continue without codebase scan
+  }
 
   const kitName = kit?.manifest.displayName ?? "none";
   const componentCount = kit?.components.length ?? 0;
@@ -137,7 +153,7 @@ export async function startServer(): Promise<void> {
     listComponents.name,
     listComponents.description,
     listComponents.inputSchema,
-    listComponents.handler(kit)
+    listComponents.handler(kit, scanResult)
   );
 
   server.tool(
