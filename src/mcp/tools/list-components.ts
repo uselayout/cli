@@ -34,7 +34,11 @@ export function handler(kit: Kit | null, scanResult: ScanResult | null) {
             ? ` [Storybook: ${c.storybook.stories.map(s => s.name).join(", ")}]`
             : "";
           const refStr = c.usesForwardRef ? " (forwardRef)" : "";
-          return `- **${c.name}** (${c.filePath})${propsStr}${refStr}${storyStr}\n  Import: \`import { ${c.name} } from '${buildImportPath(c.filePath)}'\``;
+          const importPath = buildImportPath(c.filePath);
+          const importStatement = c.exportType === "default"
+            ? `import ${c.name} from '${importPath}'`
+            : `import { ${c.name} } from '${importPath}'`;
+          return `- **${c.name}** (${c.filePath})${propsStr}${refStr}${storyStr}\n  Import: \`${importStatement}\``;
         });
       sections.push(`## Your Codebase (auto-detected)\n\n${lines.join("\n")}`);
     }
@@ -67,6 +71,8 @@ function buildImportPath(filePath: string): string {
 
   if (importPath.startsWith("src/")) {
     importPath = "@/" + importPath.slice(4);
+  } else if (!importPath.startsWith(".") && !importPath.startsWith("@")) {
+    importPath = "./" + importPath;
   }
 
   return importPath;
