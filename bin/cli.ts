@@ -11,6 +11,9 @@ import { installCommand } from "../src/cli/install.js";
 import { doctorCommand } from "../src/cli/doctor.js";
 import { serveLocalCommand } from "../src/cli/serve-local.js";
 import { scanCommand } from "../src/cli/scan.js";
+import { lintCommand } from "../src/cli/lint.js";
+import { diffCommand } from "../src/cli/diff.js";
+import { importTokensJsonCommand } from "../src/cli/import-tokens-json.js";
 
 const require = createRequire(import.meta.url);
 const pkg = require("../../package.json") as { version: string };
@@ -99,6 +102,33 @@ program
   .option("--type <type>", "Scan type: storybook, codebase, or both (default: both)")
   .action(async (targetPath?: string, options?: { sync?: boolean; project?: string; type?: string }) => {
     await scanCommand(targetPath, options);
+  });
+
+program
+  .command("lint")
+  .description("Validate layout.md, tokens.css, and tokens.json against Layout's 7 linting rules")
+  .option("--json", "Emit structured JSON (for CI / agent consumption)")
+  .option("--quiet", "Suppress info-level findings")
+  .option("--path <dir>", "Directory containing .layout/ (default: cwd)")
+  .action(async (options: { json?: boolean; quiet?: boolean; path?: string }) => {
+    await lintCommand(options);
+  });
+
+program
+  .command("diff <base> <head>")
+  .description("Compare two layout kits (paths to .layout/ dirs, or bundled kit names) and report token-level changes")
+  .option("--json", "Emit structured JSON (for CI / agent consumption)")
+  .action(async (base: string, head: string, options: { json?: boolean }) => {
+    await diffCommand(base, head, options);
+  });
+
+program
+  .command("import-tokens <tokens-json>")
+  .description("Seed a new .layout/ directory from a W3C DTCG tokens.json file")
+  .option("--name <name>", "Project name written into the generated kit.json", "Imported Kit")
+  .option("--path <dir>", "Target directory containing .layout/ (default: cwd)")
+  .action(async (tokensJson: string, options: { name?: string; path?: string }) => {
+    await importTokensJsonCommand(tokensJson, options);
   });
 
 program.parse();
