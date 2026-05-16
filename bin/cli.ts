@@ -69,7 +69,8 @@ program
   .option("--target <tool>", "Specific tool: claude, cursor, windsurf, vscode, codex, or gemini")
   .option("--global", "Install globally (available in all projects, Claude Code only)")
   .option("--skip-figma", "Skip Figma and Playwright MCP setup")
-  .action(async (options: { target?: string; global?: boolean; skipFigma?: boolean }) => {
+  .option("--live", "Also set up layout Live: build plugin (Vite/Next), .layout/live/, CLAUDE.md block")
+  .action(async (options: { target?: string; global?: boolean; skipFigma?: boolean; live?: boolean }) => {
     await installCommand(options);
   });
 

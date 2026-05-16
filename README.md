@@ -79,6 +79,53 @@ sent over the network.
 
 ---
 
+## Build plugins (preview)
+
+> Added in v0.8.0. Power layout Live's click-to-source resolution.
+
+Two zero-config build plugins inject `data-layout-source-*` attributes into
+your JSX **in dev only** (no-ops in production), so layout Live can map any
+clicked DOM element straight back to its source file, line, and component.
+They ship as sub-exports — no extra `npm install`.
+
+**Vite:**
+
+```ts
+// vite.config.ts
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import layout from "@layoutdesign/context/vite-plugin";
+
+export default defineConfig({
+  plugins: [layout(), react()], // layout() must come before react()
+});
+```
+
+**Next.js:**
+
+```ts
+// next.config.ts
+import withLayout from "@layoutdesign/context/next-plugin";
+
+export default withLayout({
+  // ...your next config (an existing webpack() override is preserved)
+});
+```
+
+Or let the CLI wire it up for you (detects the framework, edits the config
+with `recast` so formatting and comments survive, backs the original up first,
+scaffolds `.layout/live/`, and augments `CLAUDE.md`):
+
+```bash
+npx @layoutdesign/context install --live
+```
+
+Re-running `install --live` is idempotent. Both plugins skip Fragments,
+capitalised components, and pre-attributed elements, and preserve source maps
+so stack traces still point at your real line numbers.
+
+---
+
 ## CLI Commands
 
 | Command | Description |

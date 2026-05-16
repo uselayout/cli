@@ -1,12 +1,14 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import readline from "node:readline";
 import { execFileSync } from "node:child_process";
 import chalk from "chalk";
 import {
   addFigmaMcpServer as sharedAddFigma,
   addPlaywrightMcpServer as sharedAddPlaywright,
 } from "./setup-utils.js";
+import { installLive } from "../install/live.js";
 
 const MCP_CONFIG = {
   command: "npx",
@@ -313,10 +315,26 @@ function addPlaywrightMcpServer(): boolean {
   return result.success;
 }
 
+/** Ask a yes/no question on a TTY. Resolves false when non-interactive. */
+function confirm(question: string): Promise<boolean> {
+  if (!process.stdin.isTTY) return Promise.resolve(false);
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+  return new Promise((resolve) => {
+    rl.question(`${question} ${chalk.dim("(y/N)")} `, (answer) => {
+      rl.close();
+      resolve(/^y(es)?$/i.test(answer.trim()));
+    });
+  });
+}
+
 export async function installCommand(options: {
   target?: string;
   global?: boolean;
   skipFigma?: boolean;
+  live?: boolean;
 }): Promise<void> {
   console.log();
   console.log(chalk.bold("Layout — Installing MCP servers"));
@@ -392,6 +410,17 @@ export async function installCommand(options: {
     console.log(chalk.bold("  Figma integration"));
     addFigmaMcpServer();
     addPlaywrightMcpServer();
+  }
+
+  // --- 2b. layout Live (opt-in) ---
+  let wantLive = options.live ?? false;
+  if (options.live === undefined) {
+    wantLive = await confirm(
+      "  Set up layout Live? (build plugin + .layout/live/ + CLAUDE.md block)"
+    );
+  }
+  if (wantLive) {
+    await installLive(process.cwd());
   }
 
   // --- 3. Summary ---

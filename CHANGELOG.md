@@ -19,6 +19,21 @@ This project adheres to [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [0.8.0] - 2026-05-16
+
+### Added
+- **Build plugins (preview).** Two new sub-exports of `@layoutdesign/context` that inject `data-layout-source-*` attributes into JSX during dev so layout Live can resolve a clicked element to its exact source location:
+  - `@layoutdesign/context/vite-plugin` — `import layout from "@layoutdesign/context/vite-plugin"` (place before `@vitejs/plugin-react`). `enforce: 'pre'`, `apply: 'serve'`.
+  - `@layoutdesign/context/next-plugin` — `import withLayout from "@layoutdesign/context/next-plugin"`; a `NextConfig` HOC that adds a dev-only webpack rule (Babel via webpack) and composes with an existing user `webpack` override.
+- Shared Babel transform used by both plugins. Injects `data-layout-source-file`, `data-layout-source-line`, `data-layout-source-col`, `data-layout-component`. Skips Fragments, capitalised/member-expression components, the raw-HTML escape-hatch prop, and pre-attributed elements. Idempotent, dev-only, source-map-preserving, and pass-through on malformed input.
+- `install --live` flag (and an interactive "Set up layout Live?" prompt on a TTY): detects Vite/Next from `package.json`, adds the matching plugin to the config via `recast` (formatting + comments preserved; original backed up to `<config>.layout-backup`), scaffolds `.layout/live/` with `config.json` + a local `.gitignore`, and appends the delimited `layout-live` managed block to `CLAUDE.md`. Every step is idempotent.
+
+### Notes
+- Plugins are no-ops in production builds — debugging attrs never ship to end users.
+- The existing 18 MCP tools and all prior exports are unchanged; `exports` only gains the two additive sub-exports.
+
+---
+
 ## [0.7.0] - 2026-05-16
 
 ### Added
