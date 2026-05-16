@@ -19,6 +19,23 @@ This project adheres to [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [0.7.0] - 2026-05-16
+
+### Added
+- **Live integration (preview).** Four new MCP tools that let AI coding agents query the layout Live desktop app:
+  - `get-selected-element` — the element currently selected in Live (returns `{ running: false }` when Live isn't running).
+  - `get-recent-visual-edits` — recent class/token/inline-style edits; reads Live's socket when running, falls back to the on-disk `.layout/live/recent-edits.json` log otherwise.
+  - `lock-file` / `unlock-file` — coordinate file writes between Claude Code and Live via an atomic, `proper-lockfile`-backed `.layout/live/locks.json`. Stale (expired) locks are taken over automatically with a warning.
+- `check-setup` now reports an additive `live` status field: `{ installed, running, version?, project? }`. No breaking change to existing output.
+- Shared `_live-socket` helper: line-delimited JSON client for Live's Unix socket (named pipe on Windows). `ENOENT` / stale-socket / timeout all resolve cleanly to "not running" rather than throwing.
+- Unit test suite (`npm test`) covering tool registration, Zod schema validation, socket-absent fallback paths, and lock acquire/release/conflict/expiry-takeover.
+
+### Notes
+- All four tools register unconditionally and return cleanly-typed "Live not running" responses when the desktop app is absent.
+- The existing 14 tools are unchanged (now 18 total).
+
+---
+
 ## [0.1.14] - 2026-03-15
 
 ### Added

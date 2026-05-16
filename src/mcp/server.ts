@@ -28,6 +28,11 @@ import * as getScreenshots from "./tools/get-screenshots.js";
 import * as checkSetup from "./tools/check-setup.js";
 import * as pushTokensToFigma from "./tools/push-tokens-to-figma.js";
 import * as scanProject from "./tools/scan-project.js";
+// Live integration tools (v0.7.0) — query the layout Live desktop app
+import * as getSelectedElement from "./tools/get-selected-element.js";
+import * as getRecentVisualEdits from "./tools/get-recent-visual-edits.js";
+import * as lockFile from "./tools/lock-file.js";
+import * as unlockFile from "./tools/unlock-file.js";
 
 /**
  * Start the Layout Context MCP server.
@@ -224,6 +229,36 @@ export async function startServer(): Promise<void> {
     scanProject.description,
     scanProject.inputSchema,
     scanProject.handler()
+  );
+
+  // Live integration tools (v0.7.0). Registered unconditionally — they return
+  // cleanly-typed "Live not running" responses when the desktop app is absent.
+  server.tool(
+    getSelectedElement.name,
+    getSelectedElement.description,
+    getSelectedElement.inputSchema,
+    getSelectedElement.handler()
+  );
+
+  server.tool(
+    getRecentVisualEdits.name,
+    getRecentVisualEdits.description,
+    getRecentVisualEdits.inputSchema,
+    getRecentVisualEdits.handler()
+  );
+
+  server.tool(
+    lockFile.name,
+    lockFile.description,
+    lockFile.inputSchema,
+    lockFile.handler()
+  );
+
+  server.tool(
+    unlockFile.name,
+    unlockFile.description,
+    unlockFile.inputSchema,
+    unlockFile.handler()
   );
 
   // Connect via stdio

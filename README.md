@@ -55,6 +55,30 @@ Eleven tools are registered with the MCP server automatically.
 
 ---
 
+## Live integration (preview)
+
+> Added in v0.7.0. Pairs with the **layout Live** desktop app.
+
+When the [layout Live](https://layout.design) desktop app is running, four
+extra MCP tools give your AI coding agent context on what you're doing
+visually:
+
+| Tool | Description |
+|------|-------------|
+| `get-selected-element` | Returns the element currently selected in Live. Use when the user says "this" or "that one". Returns `{ running: false }` if Live isn't running. |
+| `get-recent-visual-edits` | Recent class/token/inline-style edits. Reads Live's socket when running; falls back to the on-disk `.layout/live/recent-edits.json` log otherwise — so it's useful even when Live is closed. |
+| `lock-file` | Reserves exclusive write access to a file before editing, so Claude and Live don't clobber each other. |
+| `unlock-file` | Releases a previously-acquired lock. |
+
+These tools register unconditionally and degrade gracefully: if Live isn't
+running they return cleanly-typed "not running" responses rather than errors.
+File locks are coordinated atomically via `.layout/live/locks.json`
+(gitignore it in your project). `check-setup` also reports Live's status under
+a new `live` field. Live communicates over a local Unix socket — nothing is
+sent over the network.
+
+---
+
 ## CLI Commands
 
 | Command | Description |

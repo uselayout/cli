@@ -1,10 +1,92 @@
 import { z } from "zod";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import os from "node:os";
+import { execFileSync } from "node:child_process";
 import {
   checkMcpRegistration,
   addFigmaMcpServer,
   addPlaywrightMcpServer,
   testEndpointReachable,
 } from "../../cli/setup-utils.js";
+import { connectToLive } from "./_live-socket.js";
+
+/** Structured status of the layout Live desktop app for `check-setup`. */
+export interface LiveStatus {
+  installed: boolean;
+  running: boolean;
+  version?: string;
+  project?: string;
+}
+
+/** Best-effort detection of a locally installed `layout-live` binary/app. */
+function isLiveInstalled(): boolean {
+  const candidates = [
+    "/Applications/Layout Live.app",
+    "/Applications/layout-live.app",
+    join(os.homedir(), "Applications", "Layout Live.app"),
+  ];
+  if (candidates.some((p) => existsSync(p))) return true;
+  try {
+    const cmd = process.platform === "win32" ? "where" : "which";
+    execFileSync(cmd, ["layout-live"], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Additive `check-setup` field (v0.7.0). Queries the Live socket for running
+ * status; never throws — Live being absent is the common, non-error case.
+ */
+export async function getLiveStatus(): Promise<LiveStatus> {
+  const installed = isLiveInstalled();
+  const live = await connectToLive();
+  if (!live) {
+    return { installed, running: false };
+  }
+  try {
+    const status = await live.send<{
+      running?: boolean;
+      version?: string;
+      project?: string;
+    }>({ method: "check-status" });
+    return {
+      installed: true,
+      running: status?.running !== false,
+      version: status?.version,
+      project: status?.project,
+    };
+  } catch {
+    return { installed, running: false };
+  } finally {
+    live.close();
+  }
+}
+
+function renderLive(live: LiveStatus): string {
+  const icon = live.running ? "✅" : live.installed ? "⚠️" : "❌";
+  const lines = [`### layout Live ${icon}\n`];
+  if (live.running) {
+    lines.push(
+      `- Status: running${live.version ? ` (v${live.version})` : ""}\n`
+    );
+    if (live.project) lines.push(`- Project: ${live.project}\n`);
+  } else if (live.installed) {
+    lines.push("- Status: installed but not running\n");
+    lines.push("- Open the layout Live app to enable visual-edit context\n");
+  } else {
+    lines.push("- Status: not installed (optional)\n");
+    lines.push(
+      "- layout Live adds visual-edit context. Tools still work without it.\n"
+    );
+  }
+  lines.push("```json");
+  lines.push(JSON.stringify({ live }, null, 2));
+  lines.push("```\n");
+  return lines.join("\n");
+}
 
 export const name = "check-setup";
 
@@ -17,7 +99,7 @@ export const description =
 
 export const inputSchema = {
   focus: z
-    .enum(["all", "figma", "playwright", "layout"])
+    .enum(["all", "figma", "playwright", "layout", "live"])
     .optional()
     .describe("What to check. Default: 'all'"),
   fix: z
@@ -29,7 +111,7 @@ export const inputSchema = {
 };
 
 type Input = {
-  focus?: "all" | "figma" | "playwright" | "layout";
+  focus?: "all" | "figma" | "playwright" | "layout" | "live";
   fix?: boolean;
 };
 
@@ -67,6 +149,11 @@ export function handler() {
     // --- Layout MCP ---
     if (focus === "all" || focus === "layout") {
       sections.push(checkLayout(state));
+    }
+
+    // --- layout Live (additive, v0.7.0) ---
+    if (focus === "all" || focus === "live") {
+      sections.push(renderLive(await getLiveStatus()));
     }
 
     // --- Next Steps ---

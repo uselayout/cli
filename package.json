@@ -1,6 +1,6 @@
 {
   "name": "@layoutdesign/context",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Design system context for AI coding agents — MCP server + CLI + live preview",
   "license": "MIT",
   "type": "module",
@@ -27,6 +27,7 @@
     "build": "tsc && mkdir -p dist/src/preview/static && cp src/preview/static/index.html dist/src/preview/static/index.html",
     "dev": "tsc --watch",
     "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test test/*.test.ts",
     "serve": "node dist/bin/cli.js serve",
     "preview": "node dist/bin/cli.js serve"
   },
@@ -49,15 +50,18 @@
   "homepage": "https://layout.design",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
-    "commander": "^13.1.0",
     "chalk": "^5.4.1",
-    "ws": "^8.18.0",
+    "commander": "^13.1.0",
     "open": "^10.1.0",
-    "typescript": "^5.7.3"
+    "proper-lockfile": "^4.1.2",
+    "typescript": "^5.7.3",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "@types/node": "^22.13.10",
-    "@types/ws": "^8.5.14"
+    "@types/proper-lockfile": "^4.1.4",
+    "@types/ws": "^8.5.14",
+    "tsx": "^4.22.0"
   },
   "engines": {
     "node": ">=18"
