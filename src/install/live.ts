@@ -283,41 +283,68 @@ function ensureLayoutLiveDir(projectRoot: string): Changes {
   return { changed };
 }
 
-function appendClaudeMdSection(projectRoot: string): Changes {
-  const claudePath = path.join(projectRoot, "CLAUDE.md");
-  let existing = "";
-  if (fs.existsSync(claudePath)) {
-    existing = fs.readFileSync(claudePath, "utf8");
-  }
+/**
+ * Apply the delimited managed block to one agent file, idempotently.
+ * `createIfMissing` distinguishes CLAUDE.md (always created) from
+ * AGENTS.md / .cursorrules (only augmented if the project already has them).
+ */
+function applyManagedBlock(
+  file: string,
+  label: string,
+  createIfMissing: boolean
+): Changes {
+  const exists = fs.existsSync(file);
+  if (!exists && !createIfMissing) return { changed: false };
+  const existing = exists ? fs.readFileSync(file, "utf8") : "";
 
   if (existing.includes(CLAUDE_BEGIN)) {
-    // Re-sync the managed block in place (idempotent — content may have moved
-    // on between CLI versions).
     const before = existing.slice(0, existing.indexOf(CLAUDE_BEGIN));
     const afterIdx = existing.indexOf(CLAUDE_END);
     const after =
-      afterIdx === -1
-        ? ""
-        : existing.slice(afterIdx + CLAUDE_END.length);
+      afterIdx === -1 ? "" : existing.slice(afterIdx + CLAUDE_END.length);
     const next = `${before}${CLAUDE_BLOCK}${after}`;
     if (next === existing) {
-      console.log(chalk.dim("  ↳"), "CLAUDE.md: managed block already current");
+      console.log(chalk.dim("  ↳"), `${label}: managed block already current`);
       return { changed: false };
     }
-    fs.writeFileSync(claudePath, next);
-    console.log(chalk.green("  ✓"), "CLAUDE.md: refreshed layout-live block");
+    fs.writeFileSync(file, next);
+    console.log(chalk.green("  ✓"), `${label}: refreshed layout-live block`);
     return { changed: true };
   }
 
-  const sep = existing.length === 0 ? "" : existing.endsWith("\n") ? "\n" : "\n\n";
-  fs.writeFileSync(claudePath, `${existing}${sep}${CLAUDE_BLOCK}\n`);
+  const sep =
+    existing.length === 0 ? "" : existing.endsWith("\n") ? "\n" : "\n\n";
+  fs.writeFileSync(file, `${existing}${sep}${CLAUDE_BLOCK}\n`);
   console.log(
     chalk.green("  ✓"),
     existing.length === 0
-      ? "CLAUDE.md: created with layout-live block"
-      : "CLAUDE.md: appended layout-live block"
+      ? `${label}: created with layout-live block`
+      : `${label}: appended layout-live block`
   );
   return { changed: true };
+}
+
+function appendClaudeMdSection(projectRoot: string): Changes {
+  // CLAUDE.md is created if absent; AGENTS.md / .cursorrules are only
+  // augmented when the project already exports them.
+  const claude = applyManagedBlock(
+    path.join(projectRoot, "CLAUDE.md"),
+    "CLAUDE.md",
+    true
+  );
+  const agents = applyManagedBlock(
+    path.join(projectRoot, "AGENTS.md"),
+    "AGENTS.md",
+    false
+  );
+  const cursor = applyManagedBlock(
+    path.join(projectRoot, ".cursorrules"),
+    ".cursorrules",
+    false
+  );
+  return {
+    changed: claude.changed || agents.changed || cursor.changed,
+  };
 }
 
 export async function installLive(projectRoot: string): Promise<void> {

@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"/Users/matt/Cursor Projects/Layout/testing-tracker.sh\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

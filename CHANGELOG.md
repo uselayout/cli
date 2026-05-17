@@ -6,6 +6,18 @@ This project adheres to [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [0.9.0]
+
+### Added
+- `install --live` now augments `AGENTS.md` and `.cursorrules` with the
+  layout-live managed block too (only when the project already has them),
+  alongside the always-managed `CLAUDE.md` block. Idempotent.
+- New `live-notify [file]` CLI subcommand: the optional Claude Code hook
+  pings a running layout Live over its Unix socket after Claude edits a
+  file. Silent no-op when Live isn't running.
+
+---
+
 ## [Unreleased]
 
 ### Changed

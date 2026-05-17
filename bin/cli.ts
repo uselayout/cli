@@ -14,6 +14,7 @@ import { scanCommand } from "../src/cli/scan.js";
 import { lintCommand } from "../src/cli/lint.js";
 import { diffCommand } from "../src/cli/diff.js";
 import { importTokensJsonCommand } from "../src/cli/import-tokens-json.js";
+import { liveNotifyCommand } from "../src/cli/live-notify.js";
 
 const require = createRequire(import.meta.url);
 const pkg = require("../../package.json") as { version: string };
@@ -130,6 +131,15 @@ program
   .option("--path <dir>", "Target directory containing .layout/ (default: cwd)")
   .action(async (tokensJson: string, options: { name?: string; path?: string }) => {
     await importTokensJsonCommand(tokensJson, options);
+  });
+
+program
+  .command("live-notify [file]")
+  .description(
+    "Notify a running layout Live that a file changed (optional Claude Code hook; silent no-op if Live isn't running)"
+  )
+  .action(async (file?: string) => {
+    await liveNotifyCommand(file);
   });
 
 program.parse();
