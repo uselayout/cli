@@ -6,6 +6,20 @@ This project adheres to [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [0.10.1]
+
+### Changed
+- The Next.js plugin now emits a one-time warning when **Turbopack**
+  (`next dev --turbo`, default in newer Next) is detected: the dev
+  source-tagging runs via the webpack hook, which Turbopack ignores, so
+  layout Live couldn't resolve elements — previously this failed
+  silently. Run `next dev` without `--turbo` for the visual-edit loop.
+  App Router client **and** server components are tagged under webpack
+  dev (all `.tsx`/`.jsx`); native Turbopack/SWC tagging is tracked
+  separately.
+
+---
+
 ## [0.10.0]
 
 ### Added

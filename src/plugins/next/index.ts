@@ -44,9 +44,23 @@ function babelLoaderPath(): string {
   return fileURLToPath(new URL("./babel-loader.js", import.meta.url));
 }
 
+let turbopackWarned = false;
+
 export default function withLayout(
   nextConfig: NextConfigLike = {}
 ): NextConfigLike {
+  // Turbopack (`next dev --turbo`, default in newer Next) ignores the
+  // `webpack()` hook, so the dev tagging below never runs and layout Live
+  // would silently fail to resolve elements. Make that explicit once
+  // rather than silent. Native Turbopack/SWC tagging is tracked separately.
+  if (process.env.TURBOPACK && !turbopackWarned) {
+    turbopackWarned = true;
+    console.warn(
+      "[@layoutdesign/context] Turbopack detected — layout Live source " +
+        "tagging needs webpack. Run `next dev` without --turbo for the " +
+        "visual-edit loop (Turbopack support is tracked, not yet shipped)."
+    );
+  }
   return {
     ...nextConfig,
     webpack(config: WebpackConfigLike, options: WebpackOptions) {

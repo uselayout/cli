@@ -48,6 +48,24 @@ test("does NOT add the rule in production builds", () => {
   assert.equal(out.module!.rules!.length, 0);
 });
 
+test("warns ONCE (not silent) when Turbopack is detected", () => {
+  const orig = console.warn;
+  const seen: string[] = [];
+  console.warn = (m?: unknown) => seen.push(String(m));
+  const hadEnv = process.env.TURBOPACK;
+  process.env.TURBOPACK = "1";
+  try {
+    withLayout({});
+    withLayout({}); // idempotent — still only one warning
+  } finally {
+    console.warn = orig;
+    if (hadEnv === undefined) delete process.env.TURBOPACK;
+    else process.env.TURBOPACK = hadEnv;
+  }
+  assert.equal(seen.length, 1);
+  assert.match(seen[0]!, /Turbopack/);
+});
+
 test("composes with a user-supplied webpack override", () => {
   let userCalled = false;
   const cfg = withLayout({
