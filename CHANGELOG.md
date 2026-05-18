@@ -6,6 +6,20 @@ This project adheres to [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [0.10.0]
+
+### Added
+- The build plugin now tags capitalised **component usage sites** that
+  pass a static `className` (`<Pill className="p-4" />`), so layout Live
+  can resolve and edit that class in place — previously every component
+  usage was skipped and surfaced as an uneditable "library component".
+  Dynamic classNames (`cn()`, `cva()`, expressions) and component usages
+  without a `className` stay untagged by design. The component must
+  forward unknown props for the attributes to reach the DOM; otherwise
+  resolution falls back to component-name only.
+
+---
+
 ## [0.9.0]
 
 ### Added

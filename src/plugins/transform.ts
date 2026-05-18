@@ -105,6 +105,35 @@ function hasRawHtmlProp(opening: t.JSXOpeningElement): boolean {
 }
 
 /**
+ * Does this element have a STATICALLY-EDITABLE `className` — a string
+ * literal, `{"…"}`, or a template literal with no expressions? Used to
+ * decide whether a capitalised component usage (`<Pill className="p-4"/>`)
+ * is worth tagging: layout Live can edit that prop string in place exactly
+ * like a host element's className. cn()/cva()/dynamic classNames are NOT
+ * editable, so those component usages stay untagged (→ library-component).
+ */
+function hasLiteralClassName(opening: t.JSXOpeningElement): boolean {
+  for (const a of opening.attributes) {
+    if (
+      !t.isJSXAttribute(a) ||
+      !t.isJSXIdentifier(a.name) ||
+      a.name.name !== "className"
+    ) {
+      continue;
+    }
+    const v = a.value;
+    if (t.isStringLiteral(v)) return true;
+    if (t.isJSXExpressionContainer(v)) {
+      const e = v.expression;
+      if (t.isStringLiteral(e)) return true;
+      if (t.isTemplateLiteral(e) && e.expressions.length === 0) return true;
+    }
+    return false; // className present but dynamic — not editable here
+  }
+  return false; // no className prop
+}
+
+/**
  * Transform `code` for `filename`, injecting the layout source-location attrs.
  *
  * Returns the original code unchanged (with `map: null`) when transformation
@@ -150,7 +179,16 @@ export function transformWithLayoutAttrs(
       // Fragments and capitalised component names: the component is attributed
       // at its own root element, not at each usage site.
       if (tagName.name === "Fragment") return;
-      if (/^[A-Z]/.test(tagName.name)) return;
+      // Capitalised component usage: normally attributed at the component's
+      // own root, NOT each call site. BUT if the call site passes a static
+      // `className` (`<Pill className="p-4"/>`), that string IS editable in
+      // place — tag the usage so layout Live can resolve + edit it (the
+      // component must forward unknown props for the attrs to reach the
+      // DOM; if it doesn't, resolution falls back to fibre-only). Dynamic
+      // classNames stay untagged → surfaced as library-component.
+      if (/^[A-Z]/.test(tagName.name) && !hasLiteralClassName(opening)) {
+        return;
+      }
       // Idempotent.
       if (isPreAttributed(opening)) return;
       // Children of the raw-HTML prop are an opaque HTML string, not JSX — the

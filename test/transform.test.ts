@@ -61,6 +61,22 @@ test("skips capitalised component elements", () => {
   assert.match(code, /<div data-layout-source-file/);
 });
 
+test("tags a capitalised component that has a static className prop", () => {
+  const { code } = run(
+    `function App(){ return <Pill className="p-4 bg-blue-500">x</Pill>; }`
+  );
+  assert.match(code, /<Pill className="p-4 bg-blue-500" data-layout-source-file/);
+});
+
+test("does NOT tag a capitalised component with a dynamic className", () => {
+  const cn = run(
+    `function App({c}){ return <Pill className={cn('p-4', c)}>x</Pill>; }`
+  ).code;
+  assert.doesNotMatch(cn, /<Pill[^>]*data-layout-source-file/);
+  const none = run(`function App(){ return <Pill>x</Pill>; }`).code;
+  assert.doesNotMatch(none, /<Pill[^>]*data-layout-source-file/);
+});
+
 test("skips member-expression elements (Context.Provider)", () => {
   const { code } = run(
     `function P({c}){ return <c.Provider value={1}><div>x</div></c.Provider>; }`
