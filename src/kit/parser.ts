@@ -83,7 +83,11 @@ export function parseComponents(content: string): KitComponent[] {
     if (!entry.trim()) continue;
 
     const lines = entry.split("\n");
-    const name = lines[0]?.trim() ?? "";
+    // Strip any leading heading marker. The first entry of a section, and every
+    // entry loaded from a standalone components/*.md file (the loader prepends
+    // "### "), retains its "###" because the split only consumes separators
+    // between entries, not a leading one.
+    const name = (lines[0] ?? "").replace(/^#+\s*/, "").trim();
     if (!name) continue;
 
     const body = lines.slice(1).join("\n");
