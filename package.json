@@ -8,12 +8,12 @@
     "layout-context": "./dist/bin/cli.js",
     "layoutdesign-context": "./dist/bin/cli.js"
   },
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "import": "./dist/src/index.js",
+      "types": "./dist/src/index.d.ts"
     },
     "./vite-plugin": {
       "import": "./dist/src/plugins/vite/index.js",
@@ -31,6 +31,9 @@
     "README.md",
     "LICENSE"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc && mkdir -p dist/src/preview/static && cp src/preview/static/index.html dist/src/preview/static/index.html",
     "dev": "tsc --watch",
