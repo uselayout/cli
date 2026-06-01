@@ -52,7 +52,7 @@ program
 
 program
   .command("use <kit-name>")
-  .description("Install a design kit from the registry")
+  .description("Install a design kit — a bundled kit or any public kit from the gallery")
   .action(async (kitName: string) => {
     await useCommand(kitName);
   });
@@ -65,15 +65,20 @@ program
   });
 
 program
-  .command("install")
-  .description("Auto-configure MCP servers (Layout + Figma + Playwright) for Claude Code, Cursor, Windsurf, VS Code, Codex, or Gemini")
+  .command("install [kit-slug]")
+  .description("Auto-configure MCP servers for Claude Code, Cursor, Windsurf, VS Code, Codex, or Gemini. Pass a gallery kit-slug to install that kit into .layout/ first.")
   .option("--target <tool>", "Specific tool: claude, cursor, windsurf, vscode, codex, or gemini")
   .option("--global", "Install globally (available in all projects, Claude Code only)")
   .option("--skip-figma", "Skip Figma and Playwright MCP setup")
   .option("--live", "Also set up layout Live: build plugin (Vite/Next), .layout/live/, CLAUDE.md block")
-  .action(async (options: { target?: string; global?: boolean; skipFigma?: boolean; live?: boolean }) => {
-    await installCommand(options);
-  });
+  .action(
+    async (
+      kitSlug: string | undefined,
+      options: { target?: string; global?: boolean; skipFigma?: boolean; live?: boolean }
+    ) => {
+      await installCommand(options, kitSlug);
+    }
+  );
 
 program
   .command("serve-local <path>")

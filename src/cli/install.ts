@@ -9,6 +9,7 @@ import {
   addPlaywrightMcpServer as sharedAddPlaywright,
 } from "./setup-utils.js";
 import { installLive } from "../install/live.js";
+import { fetchKitFromGallery } from "./fetch-kit.js";
 
 const MCP_CONFIG = {
   command: "npx",
@@ -330,12 +331,15 @@ function confirm(question: string): Promise<boolean> {
   });
 }
 
-export async function installCommand(options: {
-  target?: string;
-  global?: boolean;
-  skipFigma?: boolean;
-  live?: boolean;
-}): Promise<void> {
+export async function installCommand(
+  options: {
+    target?: string;
+    global?: boolean;
+    skipFigma?: boolean;
+    live?: boolean;
+  },
+  kitSlug?: string
+): Promise<void> {
   console.log();
   console.log(chalk.bold("Layout — Installing MCP servers"));
   if (options.global) {
@@ -344,6 +348,30 @@ export async function installCommand(options: {
     console.log(chalk.dim("  Scope: project (this project only)"));
   }
   console.log();
+
+  // If a kit slug was supplied (e.g. `install acme-design`), pull it from the
+  // public gallery into .layout/ before wiring up the MCP servers.
+  if (kitSlug) {
+    console.log(chalk.dim(`  Fetching the ${chalk.bold(kitSlug)} kit from the gallery…`));
+    const result = await fetchKitFromGallery(kitSlug);
+    if (result.status === "installed") {
+      console.log(
+        chalk.green("  ✓"),
+        `Installed the ${chalk.bold(kitSlug)} kit into .layout/`
+      );
+    } else if (result.status === "not-found") {
+      console.log(
+        chalk.red("  Error:"),
+        `Kit "${kitSlug}" not found in the gallery.`
+      );
+      console.log(chalk.dim(`  Browse kits at ${chalk.cyan("https://layout.design/gallery")}`));
+      return;
+    } else {
+      console.log(chalk.red("  Error:"), result.message);
+      return;
+    }
+    console.log();
+  }
 
   // Check .layout/ exists
   const hasLayout = fs.existsSync(

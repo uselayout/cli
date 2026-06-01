@@ -1,8 +1,10 @@
 import type { RegistryEntry } from "./types.js";
 
 /**
- * Local registry of available kits.
- * In Phase 2, this will fetch from layout.design/api/kits.
+ * Static registry of bundled free kits and premium (purchasable) kits.
+ * Community kits published to the gallery are NOT listed here — `use <slug>`
+ * and `install <slug>` fetch those on demand from
+ * layout.design/api/public/kits/<slug>/download (see fetch-kit.ts).
  */
 const REGISTRY: RegistryEntry[] = [
   {

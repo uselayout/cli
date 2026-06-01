@@ -27,6 +27,13 @@ const KNOWN_FILES = [
 const SECTION_START = "<!-- layout:design-system:start -->";
 const SECTION_END = "<!-- layout:design-system:end -->";
 
+export interface IngestResult {
+  /** Names of files/directories copied into .layout/ */
+  imported: string[];
+  /** Description of the root CLAUDE.md merge, or null if nothing was merged */
+  mergedClaudeMd: string | null;
+}
+
 export async function importCommand(zipPath: string): Promise<void> {
   const cwd = process.cwd();
   const resolvedPath = path.resolve(cwd, zipPath);
@@ -59,79 +66,15 @@ export async function importCommand(zipPath: string): Promise<void> {
     console.log();
   }
 
-  // Check that unzip is available
+  let result: IngestResult;
   try {
-    execFileSync("which", ["unzip"], { stdio: "ignore" });
-  } catch {
-    console.log(
-      chalk.red("Error:"),
-      "The 'unzip' command is required but not found."
-    );
-    console.log(
-      `  Install it with: ${chalk.cyan("sudo apt install unzip")} (Linux) or ${chalk.cyan("brew install unzip")} (macOS)`
-    );
+    result = ingestZip(resolvedPath);
+  } catch (err) {
+    console.log(chalk.red("Error:"), (err as Error).message);
     process.exit(1);
   }
 
-  // Extract to a temp directory
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "layout-import-"));
-
-  try {
-    execFileSync("unzip", ["-o", "-q", resolvedPath, "-d", tmpDir], {
-      stdio: "ignore",
-    });
-  } catch {
-    console.log(chalk.red("Error:"), "Failed to extract ZIP file.");
-    fs.rmSync(tmpDir, { recursive: true, force: true });
-    process.exit(1);
-  }
-
-  // Find the root of the extracted content.
-  // Layout ZIPs may have files at root or nested in a single directory.
-  const extractedRoot = findExtractedRoot(tmpDir);
-  const targetDir = path.join(process.cwd(), LAYOUT_DIR);
-
-  fs.mkdirSync(targetDir, { recursive: true });
-
-  const imported: string[] = [];
-
-  for (const fileName of KNOWN_FILES) {
-    const srcPath = path.join(extractedRoot, fileName);
-    if (fs.existsSync(srcPath)) {
-      fs.copyFileSync(srcPath, path.join(targetDir, fileName));
-      imported.push(fileName);
-    }
-  }
-
-  // Backward compatibility: accept DESIGN.md from old bundles, write as layout.md
-  if (!imported.includes(LAYOUT_MD_FILE)) {
-    const legacySrc = path.join(extractedRoot, "DESIGN.md");
-    if (fs.existsSync(legacySrc)) {
-      fs.copyFileSync(legacySrc, path.join(targetDir, LAYOUT_MD_FILE));
-      imported.push(LAYOUT_MD_FILE);
-    }
-  }
-
-  // Copy components directory if it exists
-  const componentsSrc = path.join(extractedRoot, "components");
-  if (fs.existsSync(componentsSrc) && fs.statSync(componentsSrc).isDirectory()) {
-    const componentsDest = path.join(targetDir, "components");
-    fs.cpSync(componentsSrc, componentsDest, { recursive: true });
-    imported.push("components/");
-  }
-
-  // Copy cursor rules if present
-  const cursorSrc = path.join(extractedRoot, ".cursor");
-  if (fs.existsSync(cursorSrc) && fs.statSync(cursorSrc).isDirectory()) {
-    const cursorDest = path.join(targetDir, ".cursor");
-    fs.cpSync(cursorSrc, cursorDest, { recursive: true });
-    imported.push(".cursor/");
-  }
-
-  // Clean up temp directory
-  fs.rmSync(tmpDir, { recursive: true, force: true });
-
-  if (imported.length === 0) {
+  if (result.imported.length === 0) {
     console.log(
       chalk.yellow("Warning:"),
       "No recognised design system files found in the ZIP."
@@ -144,24 +87,104 @@ export async function importCommand(zipPath: string): Promise<void> {
 
   console.log(
     chalk.green("✓"),
-    `Imported ${imported.length} item${imported.length === 1 ? "" : "s"} into .layout/:`
+    `Imported ${result.imported.length} item${result.imported.length === 1 ? "" : "s"} into .layout/:`
   );
   console.log();
 
-  for (const file of imported) {
+  for (const file of result.imported) {
     console.log(`  ${chalk.dim("•")} ${file}`);
   }
 
-  // Merge design system rules into root CLAUDE.md
-  const mergedClaudeMd = mergeIntoRootClaudeMd();
-  if (mergedClaudeMd) {
-    console.log(`  ${chalk.dim("•")} ${mergedClaudeMd}`);
+  if (result.mergedClaudeMd) {
+    console.log(`  ${chalk.dim("•")} ${result.mergedClaudeMd}`);
   }
 
   console.log();
   console.log(
     `Run ${chalk.cyan("npx @layoutdesign/context install")} to connect the MCP server.`
   );
+}
+
+/**
+ * Extract a Layout export ZIP and copy its design-system files into .layout/.
+ * Shared by the `import` command and the gallery-kit installer (`use`/`install`).
+ * Throws on failure (missing `unzip` binary, corrupt archive) so callers can
+ * decide how to report it. Returns what was imported.
+ */
+export function ingestZip(resolvedZipPath: string): IngestResult {
+  // Check that unzip is available
+  try {
+    execFileSync("which", ["unzip"], { stdio: "ignore" });
+  } catch {
+    throw new Error(
+      "The 'unzip' command is required but not found.\n" +
+        `  Install it with: ${chalk.cyan("sudo apt install unzip")} (Linux) or ${chalk.cyan("brew install unzip")} (macOS)`
+    );
+  }
+
+  // Extract to a temp directory
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "layout-import-"));
+
+  try {
+    execFileSync("unzip", ["-o", "-q", resolvedZipPath, "-d", tmpDir], {
+      stdio: "ignore",
+    });
+  } catch {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    throw new Error("Failed to extract ZIP file.");
+  }
+
+  try {
+    // Find the root of the extracted content.
+    // Layout ZIPs may have files at root or nested in a single directory.
+    const extractedRoot = findExtractedRoot(tmpDir);
+    const targetDir = path.join(process.cwd(), LAYOUT_DIR);
+
+    fs.mkdirSync(targetDir, { recursive: true });
+
+    const imported: string[] = [];
+
+    for (const fileName of KNOWN_FILES) {
+      const srcPath = path.join(extractedRoot, fileName);
+      if (fs.existsSync(srcPath)) {
+        fs.copyFileSync(srcPath, path.join(targetDir, fileName));
+        imported.push(fileName);
+      }
+    }
+
+    // Backward compatibility: accept DESIGN.md from old bundles, write as layout.md
+    if (!imported.includes(LAYOUT_MD_FILE)) {
+      const legacySrc = path.join(extractedRoot, "DESIGN.md");
+      if (fs.existsSync(legacySrc)) {
+        fs.copyFileSync(legacySrc, path.join(targetDir, LAYOUT_MD_FILE));
+        imported.push(LAYOUT_MD_FILE);
+      }
+    }
+
+    // Copy components directory if it exists
+    const componentsSrc = path.join(extractedRoot, "components");
+    if (fs.existsSync(componentsSrc) && fs.statSync(componentsSrc).isDirectory()) {
+      const componentsDest = path.join(targetDir, "components");
+      fs.cpSync(componentsSrc, componentsDest, { recursive: true });
+      imported.push("components/");
+    }
+
+    // Copy cursor rules if present
+    const cursorSrc = path.join(extractedRoot, ".cursor");
+    if (fs.existsSync(cursorSrc) && fs.statSync(cursorSrc).isDirectory()) {
+      const cursorDest = path.join(targetDir, ".cursor");
+      fs.cpSync(cursorSrc, cursorDest, { recursive: true });
+      imported.push(".cursor/");
+    }
+
+    // Merge design system rules into root CLAUDE.md
+    const mergedClaudeMd = imported.length > 0 ? mergeIntoRootClaudeMd() : null;
+
+    return { imported, mergedClaudeMd };
+  } finally {
+    // Clean up temp directory
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
 }
 
 /**
