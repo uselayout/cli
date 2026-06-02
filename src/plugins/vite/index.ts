@@ -12,6 +12,8 @@
  * and ships without vite installed. The returned object is structurally a
  * Vite `Plugin`.
  */
+import fs from "node:fs";
+import path from "node:path";
 import { transformWithLayoutAttrs } from "../transform.js";
 
 export interface LayoutVitePluginOptions {
@@ -29,6 +31,7 @@ interface VitePluginLike {
   enforce: "pre";
   apply: "serve";
   configResolved(config: { root?: string }): void;
+  configureServer(server: unknown): void;
   transform(
     code: string,
     id: string
@@ -38,6 +41,62 @@ interface VitePluginLike {
 function toArray(v: string | string[] | undefined): string[] {
   if (!v) return [];
   return Array.isArray(v) ? v : [v];
+}
+
+/**
+ * Advertise THIS project's dev server so `npx @layoutdesign/context live` and
+ * Layout Live can bind to it deterministically — even with several localhosts
+ * running. Writes `.layout/live/dev-info.json` once the server is listening
+ * (with the *actual* bound port, which Vite may bump if 5173 is taken) and
+ * removes it on close. Best-effort: never throws, never blocks dev.
+ */
+function writeDevInfo(server: unknown, root: string): void {
+  const s = server as {
+    httpServer?: {
+      address?: () => unknown;
+      once?: (e: string, cb: () => void) => void;
+    };
+    config?: { server?: { port?: number; https?: unknown } };
+  };
+  const http = s?.httpServer;
+  if (!http?.once) return;
+  const infoPath = path.join(root, ".layout", "live", "dev-info.json");
+
+  http.once("listening", () => {
+    try {
+      const addr = http.address?.();
+      const port =
+        addr && typeof addr === "object" && "port" in addr
+          ? (addr as { port: number }).port
+          : (s?.config?.server?.port ?? 5173);
+      const protocol = s?.config?.server?.https ? "https" : "http";
+      fs.mkdirSync(path.dirname(infoPath), { recursive: true });
+      fs.writeFileSync(
+        infoPath,
+        JSON.stringify(
+          {
+            projectRoot: root,
+            url: `${protocol}://localhost:${port}`,
+            port,
+            pid: process.pid,
+            startedAt: new Date().toISOString(),
+          },
+          null,
+          2
+        )
+      );
+    } catch {
+      /* never break the dev server over a hint file */
+    }
+  });
+
+  http.once("close", () => {
+    try {
+      fs.rmSync(infoPath, { force: true });
+    } catch {
+      /* ignore */
+    }
+  });
 }
 
 export default function layout(
@@ -54,6 +113,9 @@ export default function layout(
     apply: "serve",
     configResolved(config) {
       if (config?.root) root = config.root;
+    },
+    configureServer(server) {
+      writeDevInfo(server, root);
     },
     transform(code, id) {
       const clean = id.split("?")[0] ?? id;

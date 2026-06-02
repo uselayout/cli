@@ -15,6 +15,7 @@ import { lintCommand } from "../src/cli/lint.js";
 import { diffCommand } from "../src/cli/diff.js";
 import { importTokensJsonCommand } from "../src/cli/import-tokens-json.js";
 import { liveNotifyCommand } from "../src/cli/live-notify.js";
+import { liveOpenCommand } from "../src/cli/live-open.js";
 
 const require = createRequire(import.meta.url);
 const pkg = require("../../package.json") as { version: string };
@@ -145,6 +146,15 @@ program
   )
   .action(async (file?: string) => {
     await liveNotifyCommand(file);
+  });
+
+program
+  .command("live [project-path]")
+  .description("Open Layout Live, auto-bound to this project's running dev server (no manual URL)")
+  .option("--port <n>", "Dev server port (default: read .layout/live/dev-info.json, then probe)")
+  .option("--live-path <path>", "Path to the Layout Live executable (default: auto-detect)")
+  .action(async (projectPath?: string, options?: { port?: string; livePath?: string }) => {
+    await liveOpenCommand(projectPath, options ?? {});
   });
 
 program.parse();

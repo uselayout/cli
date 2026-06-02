@@ -33,6 +33,8 @@ const CLAUDE_BLOCK = `${CLAUDE_BEGIN}
 
 The user has layout Live installed (desktop app). They may make visual edits — colour, spacing, typography tweaks — directly in their running app. These edits land in source files instantly.
 
+To open it (or tell the user to), run \`npx @layoutdesign/context live\` from the project root with the dev server running — it auto-binds Live to this project's dev server, no manual URL.
+
 When relevant, use these MCP tools:
 - \`get-recent-visual-edits\` — recent class/token changes
 - \`get-selected-element\` — element currently selected in Live (use when the user says "this" or "that one")
@@ -368,5 +370,9 @@ export async function installLive(projectRoot: string): Promise<void> {
   console.log();
   console.log(
     chalk.dim("  layout Live tools are exposed by the MCP server automatically.")
+  );
+  console.log(
+    chalk.dim("  Open it any time with your dev server running:"),
+    chalk.cyan("npx @layoutdesign/context live")
   );
 }
