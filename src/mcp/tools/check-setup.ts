@@ -20,7 +20,7 @@ export interface LiveStatus {
 }
 
 /** Best-effort detection of a locally installed `layout-live` binary/app. */
-function isLiveInstalled(): boolean {
+export function isLiveInstalled(): boolean {
   const candidates = [
     "/Applications/Layout Live.app",
     "/Applications/layout-live.app",

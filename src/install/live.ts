@@ -34,6 +34,7 @@ const CLAUDE_BLOCK = `${CLAUDE_BEGIN}
 The user has layout Live installed (desktop app). They may make visual edits — colour, spacing, typography tweaks — directly in their running app. These edits land in source files instantly.
 
 When relevant, use these MCP tools:
+- \`open-live\` — open/focus layout Live so the user can see and tweak the UI (call this after generating or changing a component when they want to view it)
 - \`get-recent-visual-edits\` — recent class/token changes
 - \`get-selected-element\` — element currently selected in Live (use when the user says "this" or "that one")
 - \`lock-file\` / \`unlock-file\` — coordinate file access before editing

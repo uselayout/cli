@@ -33,6 +33,7 @@ import * as getSelectedElement from "./tools/get-selected-element.js";
 import * as getRecentVisualEdits from "./tools/get-recent-visual-edits.js";
 import * as lockFile from "./tools/lock-file.js";
 import * as unlockFile from "./tools/unlock-file.js";
+import * as openLive from "./tools/open-live.js";
 
 /**
  * Start the Layout Context MCP server.
@@ -259,6 +260,13 @@ export async function startServer(): Promise<void> {
     unlockFile.description,
     unlockFile.inputSchema,
     unlockFile.handler()
+  );
+
+  server.tool(
+    openLive.name,
+    openLive.description,
+    openLive.inputSchema,
+    openLive.handler()
   );
 
   // Connect via stdio
