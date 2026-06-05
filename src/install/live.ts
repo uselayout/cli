@@ -492,6 +492,16 @@ export async function installLive(projectRoot: string): Promise<void> {
     // `next dev` throws on a config that references a missing module.
     ensureDependency(projectRoot);
     installPlugin(projectRoot, framework);
+    // The Next plugin is webpack-only; Turbopack silently bypasses it.
+    if (framework === "next") {
+      const fix = fixTurbopackDevScript(projectRoot);
+      if (fix.changed) {
+        console.log(
+          chalk.green("  ✓"),
+          `package.json: dev → "${fix.after}" ${chalk.dim("(Turbopack bypasses source tagging)")}`
+        );
+      }
+    }
   }
 
   ensureLayoutLiveDir(projectRoot);

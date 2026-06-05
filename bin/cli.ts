@@ -16,6 +16,7 @@ import { diffCommand } from "../src/cli/diff.js";
 import { importTokensJsonCommand } from "../src/cli/import-tokens-json.js";
 import { liveNotifyCommand } from "../src/cli/live-notify.js";
 import { liveOpenCommand } from "../src/cli/live-open.js";
+import { installLive } from "../src/install/live.js";
 
 const require = createRequire(import.meta.url);
 const pkg = require("../../package.json") as { version: string };
@@ -163,5 +164,15 @@ program
       await liveOpenCommand(projectPath, options ?? {});
     }
   );
+
+program
+  .command("setup-live [project-path]")
+  .description(
+    "Wire this project for Layout Live editing (install dep + build plugin + .layout/live/). Non-interactive; used by the app's one-click setup."
+  )
+  .action(async (projectPath?: string) => {
+    const { resolve } = await import("node:path");
+    await installLive(resolve(projectPath ?? process.cwd()));
+  });
 
 program.parse();
