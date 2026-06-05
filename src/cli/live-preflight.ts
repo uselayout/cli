@@ -18,6 +18,7 @@ import {
   detectFramework,
   isPluginWired,
   installPlugin,
+  ensureDependency,
   ensureLayoutLiveDir,
   fixTurbopackDevScript,
   type Framework,
@@ -178,6 +179,9 @@ export async function preflightSourceTags(
         `  Wire the @layoutdesign/context dev plugin into your ${framework}.config?`
       )
     ) {
+      // Dependency first — a wired config that imports a missing package
+      // breaks `next dev` outright.
+      ensureDependency(projectRoot);
       installPlugin(projectRoot, framework);
       ensureLayoutLiveDir(projectRoot);
       result.wiredPlugin = true;

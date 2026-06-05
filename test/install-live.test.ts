@@ -7,7 +7,13 @@ import assert from "node:assert/strict";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { detectFramework, installLive } from "../src/install/live.js";
+import {
+  detectFramework,
+  installLive,
+  detectPackageManager,
+  hasLayoutDependency,
+  ensureDependency,
+} from "../src/install/live.js";
 
 let tmp: string;
 let origCwd: string;
@@ -27,6 +33,28 @@ async function writePkg(deps: Record<string, string>) {
     JSON.stringify({ name: "fix", dependencies: deps }, null, 2)
   );
 }
+
+test("detectPackageManager reads the lockfile", async () => {
+  assert.equal(detectPackageManager(tmp), "npm"); // no lockfile → npm
+  await fs.writeFile(path.join(tmp, "pnpm-lock.yaml"), "");
+  assert.equal(detectPackageManager(tmp), "pnpm");
+  await fs.rm(path.join(tmp, "pnpm-lock.yaml"));
+  await fs.writeFile(path.join(tmp, "yarn.lock"), "");
+  assert.equal(detectPackageManager(tmp), "yarn");
+});
+
+test("hasLayoutDependency detects a declared dep", async () => {
+  await writePkg({ next: "15.0.0" });
+  assert.equal(hasLayoutDependency(tmp), false);
+  await writePkg({ next: "15.0.0", "@layoutdesign/context": "0.13.0" });
+  assert.equal(hasLayoutDependency(tmp), true);
+});
+
+test("ensureDependency is a no-op when already installed (no network)", async () => {
+  await writePkg({ next: "15.0.0", "@layoutdesign/context": "0.13.0" });
+  const res = ensureDependency(tmp); // must NOT shell out to a package manager
+  assert.equal(res.changed, false);
+});
 
 test("detectFramework reads package.json deps", async () => {
   await writePkg({ next: "14.0.0" });

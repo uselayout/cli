@@ -14,7 +14,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
+import { execFileSync } from "node:child_process";
 import chalk from "chalk";
+
+const LAYOUT_PKG = "@layoutdesign/context";
 
 const require = createRequire(import.meta.url);
 // recast + its TS/JSX parser are CJS — load via createRequire under ESM.
@@ -264,6 +267,65 @@ function patchNextConfig(src: string): string | null {
   return ensureImport(printed, importLine, "@layoutdesign/context/next-plugin");
 }
 
+/** The project's package manager, inferred from its lockfile. */
+export function detectPackageManager(
+  projectRoot: string
+): "pnpm" | "yarn" | "bun" | "npm" {
+  if (fs.existsSync(path.join(projectRoot, "pnpm-lock.yaml"))) return "pnpm";
+  if (fs.existsSync(path.join(projectRoot, "yarn.lock"))) return "yarn";
+  if (fs.existsSync(path.join(projectRoot, "bun.lockb"))) return "bun";
+  return "npm";
+}
+
+/** True if @layoutdesign/context is a declared dep or already in node_modules. */
+export function hasLayoutDependency(projectRoot: string): boolean {
+  try {
+    const pkg = JSON.parse(
+      fs.readFileSync(path.join(projectRoot, "package.json"), "utf8")
+    ) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
+    if ({ ...pkg.dependencies, ...pkg.devDependencies }[LAYOUT_PKG]) return true;
+  } catch {
+    /* fall through to the node_modules check */
+  }
+  return fs.existsSync(
+    path.join(projectRoot, "node_modules", "@layoutdesign", "context", "package.json")
+  );
+}
+
+/**
+ * Ensure @layoutdesign/context is installed in the user's project. A wired
+ * `next.config` imports `@layoutdesign/context/next-plugin`, so without the
+ * dependency `next dev` throws on config load — wiring the plugin without this
+ * leaves the project WORSE than before. Idempotent; best-effort (prints the
+ * manual command if the install fails).
+ */
+export function ensureDependency(projectRoot: string): Changes {
+  if (hasLayoutDependency(projectRoot)) {
+    console.log(chalk.dim("  ↳"), `${LAYOUT_PKG} already installed`);
+    return { changed: false };
+  }
+  const pm = detectPackageManager(projectRoot);
+  const args =
+    pm === "npm"
+      ? ["install", "--save-dev", LAYOUT_PKG]
+      : pm === "yarn"
+        ? ["add", "--dev", LAYOUT_PKG]
+        : ["add", "-D", LAYOUT_PKG]; // pnpm + bun
+  console.log(chalk.dim(`  ↳ Installing ${LAYOUT_PKG} with ${pm}…`));
+  try {
+    execFileSync(pm, args, { cwd: projectRoot, stdio: "ignore" });
+    console.log(chalk.green("  ✓"), `${LAYOUT_PKG} installed`);
+    return { changed: true };
+  } catch {
+    console.log(
+      chalk.yellow("  ⚠"),
+      `Couldn't install ${LAYOUT_PKG} automatically. Run it yourself:`
+    );
+    console.log(chalk.cyan(`    ${pm} ${args.join(" ")}`));
+    return { changed: false };
+  }
+}
+
 export function installPlugin(projectRoot: string, framework: Framework): Changes {
   const base = framework === "next" ? "next" : "vite";
   const configPath = findConfig(projectRoot, base);
@@ -426,6 +488,9 @@ export async function installLive(projectRoot: string): Promise<void> {
     );
   } else {
     console.log(chalk.dim(`  ↳ Framework detected: ${framework}`));
+    // Install the dependency BEFORE wiring the config that imports it, else
+    // `next dev` throws on a config that references a missing module.
+    ensureDependency(projectRoot);
     installPlugin(projectRoot, framework);
   }
 
