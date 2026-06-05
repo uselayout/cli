@@ -116,7 +116,16 @@ function writeNextDevInfo(root: string): void {
   }
 }
 
+/** True if the project uses the Next App Router (`app/` or `src/app/`). */
+function isAppRouter(root: string): boolean {
+  return (
+    fs.existsSync(path.join(root, "app")) ||
+    fs.existsSync(path.join(root, "src", "app"))
+  );
+}
+
 let turbopackWarned = false;
+let appRouterWarned = false;
 
 export default function withLayout(
   nextConfig: NextConfigLike = {}
@@ -139,18 +148,37 @@ export default function withLayout(
       if (options.dev) {
         // Advertise this project's dev server for deterministic `live` binding.
         writeNextDevInfo(process.cwd());
-        config.module ??= {};
-        config.module.rules ??= [];
-        const use: unknown[] = [];
-        if (options.defaultLoaders?.babel) {
-          use.push(options.defaultLoaders.babel);
+        // App Router: the Babel tagging pass makes Next misclassify React
+        // Server Components as client modules (a server component that exports
+        // `metadata` then fails to build). Do NOT inject it on App Router —
+        // that breaks the build, which is worse than no tagging. Source
+        // tagging for App Router is moving to a native SWC plugin. dev-info is
+        // still written above so `live` / the in-app switcher can bind.
+        if (isAppRouter(process.cwd())) {
+          if (!appRouterWarned) {
+            appRouterWarned = true;
+            console.warn(
+              "[@layoutdesign/context] Next App Router detected — element " +
+                "source tagging is paused here (the Babel pass conflicts with " +
+                "React Server Components; native SWC tagging is in progress). " +
+                "Your app builds normally; elements aren't editable in Layout " +
+                "Live yet."
+            );
+          }
+        } else {
+          config.module ??= {};
+          config.module.rules ??= [];
+          const use: unknown[] = [];
+          if (options.defaultLoaders?.babel) {
+            use.push(options.defaultLoaders.babel);
+          }
+          use.push({ loader: babelLoaderPath() });
+          config.module.rules.push({
+            test: /\.(tsx|jsx)$/,
+            exclude: /node_modules/,
+            use,
+          });
         }
-        use.push({ loader: babelLoaderPath() });
-        config.module.rules.push({
-          test: /\.(tsx|jsx)$/,
-          exclude: /node_modules/,
-          use,
-        });
       }
       // Defer to the user's own webpack override, if any.
       return typeof nextConfig.webpack === "function"

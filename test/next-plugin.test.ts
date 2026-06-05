@@ -31,6 +31,26 @@ test("preserves existing next config keys", () => {
   assert.equal(typeof cfg.webpack, "function");
 });
 
+test("does NOT add the Babel rule on App Router (would break RSC)", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "next-approuter-"));
+  await fs.mkdir(path.join(dir, "app"), { recursive: true });
+  const prevCwd = process.cwd();
+  const prevDisable = process.env.LAYOUT_LIVE_NO_DEVINFO;
+  process.chdir(dir);
+  process.env.LAYOUT_LIVE_NO_DEVINFO = "1"; // don't write dev-info in this test
+  try {
+    const cfg = withLayout({});
+    const out = cfg.webpack!({ module: { rules: [] } }, { dev: true });
+    // No tagging rule injected → Next compiles RSC normally.
+    assert.equal(out.module!.rules!.length, 0);
+  } finally {
+    process.chdir(prevCwd);
+    if (prevDisable === undefined) delete process.env.LAYOUT_LIVE_NO_DEVINFO;
+    else process.env.LAYOUT_LIVE_NO_DEVINFO = prevDisable;
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("adds a tsx/jsx rule in dev with babel-loader chained after next's", () => {
   const cfg = withLayout({});
   const { config, options } = fakeWebpackCtx();
