@@ -153,8 +153,15 @@ program
   .description("Open Layout Live, auto-bound to this project's running dev server (no manual URL)")
   .option("--port <n>", "Dev server port (default: read .layout/live/dev-info.json, then probe)")
   .option("--live-path <path>", "Path to the Layout Live executable (default: auto-detect)")
-  .action(async (projectPath?: string, options?: { port?: string; livePath?: string }) => {
-    await liveOpenCommand(projectPath, options ?? {});
-  });
+  .option("--no-setup", "Skip the source-tag preflight (open as-is)")
+  .option("-y, --yes", "Auto-accept dev-plugin setup edits without prompting")
+  .action(
+    async (
+      projectPath?: string,
+      options?: { port?: string; livePath?: string; setup?: boolean; yes?: boolean }
+    ) => {
+      await liveOpenCommand(projectPath, options ?? {});
+    }
+  );
 
 program.parse();

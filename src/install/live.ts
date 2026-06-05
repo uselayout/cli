@@ -92,6 +92,71 @@ function findConfig(projectRoot: string, base: string): string | null {
   return null;
 }
 
+/** True if the layout build plugin is already wired into the config file. */
+export function isPluginWired(
+  projectRoot: string,
+  framework: Framework
+): boolean {
+  if (framework === "unknown") return false;
+  const base = framework === "next" ? "next" : "vite";
+  const configPath = findConfig(projectRoot, base);
+  if (!configPath) return false;
+  try {
+    const src = fs.readFileSync(configPath, "utf8");
+    const specifier =
+      framework === "next"
+        ? "@layoutdesign/context/next-plugin"
+        : "@layoutdesign/context/vite-plugin";
+    return src.includes(specifier);
+  } catch {
+    return false;
+  }
+}
+
+export interface TurbopackFix {
+  changed: boolean;
+  /** The `dev` script name that was (or would be) changed. */
+  script?: string;
+  before?: string;
+  after?: string;
+}
+
+/**
+ * Drop `--turbopack` / `--turbo` from the project's `dev` script. Next's
+ * webpack-based source-tagging plugin is bypassed under Turbopack, so the
+ * visual-edit loop needs plain `next dev`. Idempotent; only touches a `dev`
+ * script that actually runs Next with the turbo flag.
+ */
+export function fixTurbopackDevScript(projectRoot: string): TurbopackFix {
+  const pkgPath = path.join(projectRoot, "package.json");
+  let raw: string;
+  try {
+    raw = fs.readFileSync(pkgPath, "utf8");
+  } catch {
+    return { changed: false };
+  }
+  let pkg: { scripts?: Record<string, string> };
+  try {
+    pkg = JSON.parse(raw);
+  } catch {
+    return { changed: false };
+  }
+  const dev = pkg.scripts?.dev;
+  if (!dev || !/\bnext\b/.test(dev) || !/--turbopack\b|--turbo\b/.test(dev)) {
+    return { changed: false };
+  }
+  const after = dev
+    .replace(/\s*--turbopack\b/g, "")
+    .replace(/\s*--turbo\b/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  pkg.scripts!.dev = after;
+  // Re-serialise preserving the original indentation where detectable.
+  const indent = raw.match(/\n(\s+)"/)?.[1] ?? "  ";
+  fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, indent) + "\n");
+  return { changed: true, script: "dev", before: dev, after };
+}
+
 function backup(configPath: string): void {
   const backupPath = `${configPath}.layout-backup`;
   if (!fs.existsSync(backupPath)) {
@@ -199,7 +264,7 @@ function patchNextConfig(src: string): string | null {
   return ensureImport(printed, importLine, "@layoutdesign/context/next-plugin");
 }
 
-function installPlugin(projectRoot: string, framework: Framework): Changes {
+export function installPlugin(projectRoot: string, framework: Framework): Changes {
   const base = framework === "next" ? "next" : "vite";
   const configPath = findConfig(projectRoot, base);
 
@@ -258,7 +323,7 @@ function installPlugin(projectRoot: string, framework: Framework): Changes {
   return { changed: true };
 }
 
-function ensureLayoutLiveDir(projectRoot: string): Changes {
+export function ensureLayoutLiveDir(projectRoot: string): Changes {
   const liveDir = path.join(projectRoot, ".layout", "live");
   let changed = false;
 

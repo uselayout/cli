@@ -4,6 +4,14 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { promises as fs } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
+// Keep the dev-info hint file out of the repo for the webpack-composition tests
+// below; the dedicated dev-info test re-enables it against a temp cwd.
+process.env.LAYOUT_LIVE_NO_DEVINFO = "1";
+
 import withLayout from "../src/plugins/next/index.js";
 
 function fakeWebpackCtx() {
@@ -64,6 +72,40 @@ test("warns ONCE (not silent) when Turbopack is detected", () => {
   }
   assert.equal(seen.length, 1);
   assert.match(seen[0]!, /Turbopack/);
+});
+
+test("writes .layout/live/dev-info.json on first dev compile", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "next-devinfo-"));
+  const prevCwd = process.cwd();
+  const prevDisable = process.env.LAYOUT_LIVE_NO_DEVINFO;
+  const prevPort = process.env.PORT;
+  process.chdir(dir);
+  delete process.env.LAYOUT_LIVE_NO_DEVINFO;
+  process.env.PORT = "3001";
+  const cwdInside = process.cwd();
+  try {
+    const cfg = withLayout({});
+    cfg.webpack!({ module: { rules: [] } }, { dev: true });
+    const raw = await fs.readFile(
+      path.join(dir, ".layout", "live", "dev-info.json"),
+      "utf8"
+    );
+    const info = JSON.parse(raw) as {
+      projectRoot: string;
+      url: string;
+      port: number;
+    };
+    assert.equal(info.port, 3001);
+    assert.equal(info.url, "http://localhost:3001");
+    assert.equal(info.projectRoot, cwdInside);
+  } finally {
+    process.chdir(prevCwd);
+    if (prevDisable === undefined) delete process.env.LAYOUT_LIVE_NO_DEVINFO;
+    else process.env.LAYOUT_LIVE_NO_DEVINFO = prevDisable;
+    if (prevPort === undefined) delete process.env.PORT;
+    else process.env.PORT = prevPort;
+    await fs.rm(dir, { recursive: true, force: true });
+  }
 });
 
 test("composes with a user-supplied webpack override", () => {

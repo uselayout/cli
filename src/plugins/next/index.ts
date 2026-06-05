@@ -14,6 +14,8 @@
  * `next`/`webpack` are optional peers — types are kept structural so the
  * package builds and ships without them installed.
  */
+import fs from "node:fs";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 type WebpackRule = {
@@ -44,6 +46,76 @@ function babelLoaderPath(): string {
   return fileURLToPath(new URL("./babel-loader.js", import.meta.url));
 }
 
+/**
+ * The dev-server port Next is (about to be) listening on. Next doesn't expose
+ * it to `next.config`, so we read it the same way Next does: `-p`/`--port` on
+ * the dev command, then `$PORT`, else the 3000 default. The CLI verifies the
+ * server actually responds before binding, so a wrong guess is self-correcting.
+ */
+function devPort(): number {
+  const argv = process.argv;
+  const flag = argv.findIndex((a) => a === "-p" || a === "--port");
+  if (flag >= 0) {
+    const n = Number(argv[flag + 1]);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  const env = Number(process.env.PORT);
+  if (Number.isFinite(env) && env > 0) return env;
+  return 3000;
+}
+
+let devInfoWritten = false;
+
+/**
+ * Advertise THIS project's dev server so `npx @layoutdesign/context live` binds
+ * to it deterministically — even with several localhosts running. Mirrors the
+ * Vite plugin's `writeDevInfo`. Best-effort: never throws, never blocks dev.
+ * Written once on the first dev compile; removed on process exit.
+ */
+function writeNextDevInfo(root: string): void {
+  if (devInfoWritten) return;
+  // Escape hatch (tests / opt-out): skip the hint file entirely.
+  if (process.env.LAYOUT_LIVE_NO_DEVINFO === "1") return;
+  devInfoWritten = true;
+  const infoPath = path.join(root, ".layout", "live", "dev-info.json");
+  try {
+    const port = devPort();
+    fs.mkdirSync(path.dirname(infoPath), { recursive: true });
+    fs.writeFileSync(
+      infoPath,
+      JSON.stringify(
+        {
+          projectRoot: root,
+          url: `http://localhost:${port}`,
+          port,
+          pid: process.pid,
+          startedAt: new Date().toISOString(),
+        },
+        null,
+        2
+      )
+    );
+    const cleanup = () => {
+      try {
+        fs.rmSync(infoPath, { force: true });
+      } catch {
+        /* ignore */
+      }
+    };
+    process.once("exit", cleanup);
+    process.once("SIGINT", () => {
+      cleanup();
+      process.exit(0);
+    });
+    process.once("SIGTERM", () => {
+      cleanup();
+      process.exit(0);
+    });
+  } catch {
+    /* never break the dev server over a hint file */
+  }
+}
+
 let turbopackWarned = false;
 
 export default function withLayout(
@@ -65,6 +137,8 @@ export default function withLayout(
     ...nextConfig,
     webpack(config: WebpackConfigLike, options: WebpackOptions) {
       if (options.dev) {
+        // Advertise this project's dev server for deterministic `live` binding.
+        writeNextDevInfo(process.cwd());
         config.module ??= {};
         config.module.rules ??= [];
         const use: unknown[] = [];

@@ -18,14 +18,20 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import readline from "node:readline/promises";
 import { spawn, execFileSync } from "node:child_process";
 import { connectToLive } from "../mcp/tools/_live-socket.js";
+import { preflightSourceTags, htmlHasSourceTags } from "./live-preflight.js";
 
 export interface LiveOpenOptions {
   /** Override dev-server port (skip dev-info.json / probing). */
   port?: string;
   /** Explicit path to the Layout Live executable (skip auto-detect). */
   livePath?: string;
+  /** Skip the source-tag preflight (open as-is). */
+  setup?: boolean;
+  /** Auto-accept preflight file edits without prompting. */
+  yes?: boolean;
 }
 
 const PROBE_PORTS = [5173, 3000, 3001, 4321, 5174, 8080];
@@ -48,6 +54,62 @@ async function serverResponds(url: string, timeoutMs = 1200): Promise<boolean> {
 interface DevInfo {
   projectRoot: string;
   url: string;
+}
+
+export interface DiscoverDeps {
+  responds?: (url: string) => Promise<boolean>;
+  hasTags?: (url: string) => Promise<boolean>;
+  prompt?: (urls: string[]) => Promise<string | null>;
+  ports?: number[];
+}
+
+/**
+ * Probe every conventional port, then choose THIS project's dev server instead
+ * of the first random responder. Prefers servers already emitting Layout source
+ * tags; if several qualify, asks the user. Returns the chosen URL or null.
+ * Deps are injectable for tests.
+ */
+export async function discoverDevUrl(deps: DiscoverDeps = {}): Promise<string | null> {
+  const responds = deps.responds ?? serverResponds;
+  const hasTags = deps.hasTags ?? htmlHasSourceTags;
+  const prompt = deps.prompt ?? promptDevUrl;
+  const ports = deps.ports ?? PROBE_PORTS;
+
+  const responders: string[] = [];
+  for (const port of ports) {
+    const url = `http://localhost:${port}`;
+    if (await responds(url)) responders.push(url);
+  }
+  if (responders.length === 0) return null;
+  if (responders.length === 1) return responders[0] ?? null;
+
+  // Several servers up — prefer Layout-tagged ones (this project's, most
+  // likely), then disambiguate by asking rather than guessing.
+  const tagged: string[] = [];
+  for (const url of responders) {
+    if (await hasTags(url)) tagged.push(url);
+  }
+  const candidates = tagged.length > 0 ? tagged : responders;
+  if (candidates.length === 1) return candidates[0] ?? null;
+  return prompt(candidates);
+}
+
+/** Ask the user which running dev server to use. Non-TTY → first candidate. */
+async function promptDevUrl(urls: string[]): Promise<string | null> {
+  if (!process.stdin.isTTY) return urls[0] ?? null;
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+  try {
+    console.log("Multiple dev servers are running:");
+    urls.forEach((u, i) => console.log(`  ${i + 1}. ${u}`));
+    const ans = (await rl.question(`Which one is this project? [1-${urls.length}] `)).trim();
+    const idx = Number(ans) - 1;
+    return urls[idx] ?? urls[0] ?? null;
+  } finally {
+    rl.close();
+  }
 }
 
 /** Read .layout/live/dev-info.json if present and well-formed. */
@@ -127,14 +189,10 @@ export async function liveOpenCommand(
     }
     devUrl = url;
   } else {
-    // Fallback probe — best effort when the plugin hint is absent.
-    for (const port of PROBE_PORTS) {
-      const url = `http://localhost:${port}`;
-      if (await serverResponds(url)) {
-        devUrl = url;
-        break;
-      }
-    }
+    // Fallback probe — best effort when the plugin hint is absent. Picks THIS
+    // project's server (Layout-tagged) over an unrelated localhost, and asks
+    // when several qualify, instead of grabbing the first open port.
+    devUrl = await discoverDevUrl();
   }
 
   if (!devUrl) {
@@ -148,10 +206,27 @@ export async function liveOpenCommand(
     return;
   }
 
-  // 2. Already running on this project? Just bring it to the front.
+  // 2. Make sure the dev server will emit source tags (else the canvas opens
+  //    dead). Wires the plugin / fixes a Turbopack dev script with consent, or
+  //    prints exact setup steps. We still open afterwards so the page is
+  //    visible; it becomes editable once the user restarts the dev server.
+  if (options.setup !== false) {
+    await preflightSourceTags(projectRoot, devUrl, { yes: options.yes });
+  }
+
+  // 3. Already running on this project? Re-bind it to this dev URL (so a new
+  //    --port actually takes effect) and bring it to the front.
   const existing = await connectToLive(projectRoot);
   if (existing) {
     try {
+      // set-dev-url rebinds a running window; older Live lacks it → fall back
+      // to focus-only so we still surface the window.
+      try {
+        await existing.send({ method: "set-dev-url", params: { url: devUrl } });
+        console.log(`✓ Re-bound Layout Live to ${devUrl}.`);
+      } catch {
+        /* older Live: no set-dev-url — focus is the best we can do */
+      }
       await existing.send({ method: "focus" });
       console.log(`✓ Layout Live is already open for this project — brought to front.\n  dev: ${devUrl}`);
       return;
@@ -163,7 +238,7 @@ export async function liveOpenCommand(
     }
   }
 
-  // 3. Launch the app, bound to project + dev server via env.
+  // 4. Launch the app, bound to project + dev server via env.
   const bin = findLiveApp(options.livePath);
   if (!bin) {
     console.error(
