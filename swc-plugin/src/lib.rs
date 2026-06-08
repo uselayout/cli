@@ -91,11 +91,14 @@ fn str_attr(name: &str, value: &str) -> JSXAttrOrSpread {
     JSXAttrOrSpread::JSXAttr(JSXAttr {
         span: DUMMY_SP,
         name: JSXAttrName::Ident(IdentName::new(name.into(), DUMMY_SP)),
-        value: Some(JSXAttrValue::Lit(Lit::Str(Str {
+        // NOTE: the JSXAttrValue string variant tracks the pinned swc_core:
+        // swc_core >= ~45 uses `Str(Str)`; older (<=35) used `Lit(Lit::Str)`.
+        // Currently pinned to swc_core 57 (Next 16.2.x).
+        value: Some(JSXAttrValue::Str(Str {
             span: DUMMY_SP,
             value: value.into(),
             raw: None,
-        }))),
+        })),
     })
 }
 
@@ -135,7 +138,7 @@ fn has_literal_classname(opening: &JSXOpeningElement) -> bool {
             continue;
         }
         return match &attr.value {
-            Some(JSXAttrValue::Lit(Lit::Str(_))) => true,
+            Some(JSXAttrValue::Str(_)) => true,
             Some(JSXAttrValue::JSXExprContainer(c)) => match &c.expr {
                 JSXExpr::Expr(e) => match &**e {
                     Expr::Lit(Lit::Str(_)) => true,

@@ -36,10 +36,10 @@ export const SWC_PLUGIN_SPECIFIER = "@layoutdesign/context/swc-plugin.wasm";
 
 /**
  * The `swc_core` major the shipped wasm is built against (swc-plugin/Cargo.toml,
- * `=35.0.0`). Must equal the host Next's bundled swc_core for the plugin to
- * load. Currently corresponds to Next 15.5.x.
+ * `=57.0.0`). Must equal the host Next's bundled swc_core for the plugin to
+ * load. Currently corresponds to Next 16.2.x (current stable).
  */
-export const WASM_TARGET_SWC_CORE = 35;
+export const WASM_TARGET_SWC_CORE = 57;
 
 /**
  * Known Next `major.minor` -> bundled `swc_core` major, read from Next's own

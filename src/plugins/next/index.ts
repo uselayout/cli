@@ -40,6 +40,7 @@ export interface NextConfigLike {
     options: WebpackOptions
   ) => WebpackConfigLike;
   experimental?: { swcPlugins?: unknown[]; [key: string]: unknown };
+  turbopack?: Record<string, unknown>;
   [key: string]: unknown;
 }
 
@@ -204,12 +205,20 @@ export default function withLayout(
     );
   }
 
+  // Advertise this project's dev server for deterministic `live` binding. Done
+  // at config-load (dev only) rather than inside webpack() so it ALSO runs under
+  // Turbopack (which ignores the webpack hook) — e.g. Next 16, Turbopack-default.
+  if (isDev) writeNextDevInfo(root);
+
   const out: NextConfigLike = {
     ...nextConfig,
+    // Next 16 builds with Turbopack by default and HARD-ERRORS when a `webpack`
+    // config is present without a `turbopack` config. We always carry a webpack
+    // hook (for Pages Router Babel tagging / user composition), so provide a
+    // turbopack config (merging any the user set) to keep `next build` working.
+    turbopack: { ...(nextConfig.turbopack ?? {}) },
     webpack(config: WebpackConfigLike, options: WebpackOptions) {
       if (options.dev) {
-        // Advertise this project's dev server for deterministic `live` binding.
-        writeNextDevInfo(root);
         // App Router: the Babel tagging pass makes Next misclassify React
         // Server Components as client modules (a server component that exports
         // `metadata` then fails to build). NEVER inject the Babel rule on App
