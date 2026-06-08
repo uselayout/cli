@@ -23,6 +23,7 @@ import {
   fixTurbopackDevScript,
   type Framework,
 } from "../install/live.js";
+import { swcTaggingReady } from "../plugins/next/index.js";
 
 const SOURCE_TAG = "data-layout-source-file";
 
@@ -99,7 +100,9 @@ function printManualSetup(framework: Framework): void {
           `    import withLayout from "@layoutdesign/context/next-plugin";\n` +
           `    export default withLayout({ /* your config */ });\n` +
           `\n  Then run the dev server WITHOUT Turbopack:\n` +
-          `    next dev        ${chalk.reset(chalk.dim("(not: next dev --turbopack)"))}`
+          `    next dev        ${chalk.reset(chalk.dim("(not: next dev --turbopack)"))}\n` +
+          `\n  App Router? Native SWC tagging (works with Turbopack) is opt-in:\n` +
+          `    ${chalk.reset(chalk.dim("LAYOUT_LIVE_SWC=1 next dev --turbopack"))}`
       )
     );
   } else {
@@ -192,7 +195,10 @@ export async function preflightSourceTags(
     }
   }
 
-  if (framework === "next") {
+  // Strip --turbopack only when the Babel (webpack) path is what tags. With
+  // native SWC tagging opted-in, the plugin runs inside Next under Turbopack
+  // too, so leave the dev script (and Turbopack) alone.
+  if (framework === "next" && !swcTaggingReady(projectRoot)) {
     const fix = fixTurbopackDevScript(projectRoot);
     if (fix.changed) {
       // package.json edit is low-risk (a one-flag removal); apply it but say so.

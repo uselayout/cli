@@ -28,6 +28,7 @@
     "dist",
     "kits",
     "skills",
+    "assets",
     "README.md",
     "LICENSE"
   ],
@@ -36,6 +37,7 @@
   },
   "scripts": {
     "build": "tsc && mkdir -p dist/src/preview/static && cp src/preview/static/index.html dist/src/preview/static/index.html",
+    "build:wasm": "cd swc-plugin && cargo build --release --target wasm32-wasip1 && mkdir -p ../assets && cp target/wasm32-wasip1/release/layout_swc_plugin.wasm ../assets/layout-swc-plugin.wasm",
     "dev": "tsc --watch",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test test/*.test.ts",
@@ -74,6 +76,7 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "@swc/core": "^1.15.40",
     "@types/babel__generator": "^7.27.0",
     "@types/babel__traverse": "^7.28.0",
     "@types/node": "^22.13.10",

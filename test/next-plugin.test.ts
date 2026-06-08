@@ -51,6 +51,81 @@ test("does NOT add the Babel rule on App Router (would break RSC)", async () => 
   }
 });
 
+test("App Router + LAYOUT_LIVE_SWC=1: injects experimental.swcPlugins, no Babel rule", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "next-swc-"));
+  await fs.mkdir(path.join(dir, "app"), { recursive: true });
+  const prevCwd = process.cwd();
+  const prevSwc = process.env.LAYOUT_LIVE_SWC;
+  process.chdir(dir);
+  process.env.LAYOUT_LIVE_SWC = "1";
+  process.env.LAYOUT_LIVE_NO_DEVINFO = "1";
+  try {
+    const cfg = withLayout({ reactStrictMode: true });
+    // Top-level swcPlugins entry present, pointing at the prebuilt wasm.
+    const plugins = cfg.experimental?.swcPlugins as Array<[string, unknown]>;
+    assert.ok(Array.isArray(plugins), "experimental.swcPlugins is set");
+    assert.equal(plugins.length, 1);
+    assert.match(plugins[0]![0], /layout-swc-plugin\.wasm$/);
+    assert.deepEqual(plugins[0]![1], {
+      projectRoot: process.cwd(),
+      dev: true,
+    });
+    // The webpack hook must still NOT add the Babel rule on App Router.
+    const out = cfg.webpack!({ module: { rules: [] } }, { dev: true });
+    assert.equal(out.module!.rules!.length, 0);
+  } finally {
+    process.chdir(prevCwd);
+    if (prevSwc === undefined) delete process.env.LAYOUT_LIVE_SWC;
+    else process.env.LAYOUT_LIVE_SWC = prevSwc;
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("App Router without opt-in: no swcPlugins (default-safe, no breakage)", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "next-noswc-"));
+  await fs.mkdir(path.join(dir, "app"), { recursive: true });
+  const prevCwd = process.cwd();
+  const prevSwc = process.env.LAYOUT_LIVE_SWC;
+  process.chdir(dir);
+  delete process.env.LAYOUT_LIVE_SWC;
+  process.env.LAYOUT_LIVE_NO_DEVINFO = "1";
+  try {
+    const cfg = withLayout({});
+    assert.equal(cfg.experimental, undefined);
+  } finally {
+    process.chdir(prevCwd);
+    if (prevSwc !== undefined) process.env.LAYOUT_LIVE_SWC = prevSwc;
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("SWC injection preserves a user's existing experimental.swcPlugins", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "next-swc-merge-"));
+  await fs.mkdir(path.join(dir, "src", "app"), { recursive: true });
+  const prevCwd = process.cwd();
+  const prevSwc = process.env.LAYOUT_LIVE_SWC;
+  process.chdir(dir);
+  process.env.LAYOUT_LIVE_SWC = "1";
+  process.env.LAYOUT_LIVE_NO_DEVINFO = "1";
+  try {
+    const userPlugin: [string, unknown] = ["user-plugin.wasm", { a: 1 }];
+    const cfg = withLayout({
+      experimental: { swcPlugins: [userPlugin], serverActions: true },
+    });
+    const plugins = cfg.experimental?.swcPlugins as Array<[string, unknown]>;
+    assert.equal(plugins.length, 2);
+    assert.deepEqual(plugins[0], userPlugin); // user's first, ours appended
+    assert.match(plugins[1]![0], /layout-swc-plugin\.wasm$/);
+    // Other experimental keys preserved.
+    assert.equal(cfg.experimental?.serverActions, true);
+  } finally {
+    process.chdir(prevCwd);
+    if (prevSwc === undefined) delete process.env.LAYOUT_LIVE_SWC;
+    else process.env.LAYOUT_LIVE_SWC = prevSwc;
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("adds a tsx/jsx rule in dev with babel-loader chained after next's", () => {
   const cfg = withLayout({});
   const { config, options } = fakeWebpackCtx();

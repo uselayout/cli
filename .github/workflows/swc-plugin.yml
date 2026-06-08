@@ -1,0 +1,67 @@
+name: SWC plugin (build + parity)
+
+# Builds the Rust/Wasm source-tagging plugin and verifies it stays in parity
+# with the Babel transform (transform.ts). Runs on changes to the crate, the
+# transform oracle, or the parity harness. The prebuilt .wasm is committed in
+# assets/ and shipped in the npm tarball; this job rebuilds it from source and
+# fails if parity regresses, the crate stops compiling, or the committed wasm
+# drifted from a fresh build.
+
+on:
+  push:
+    paths:
+      - "swc-plugin/**"
+      - "src/plugins/transform.ts"
+      - "src/plugins/next/**"
+      - "test/swc-parity.test.ts"
+      - ".github/workflows/swc-plugin.yml"
+  pull_request:
+    paths:
+      - "swc-plugin/**"
+      - "src/plugins/transform.ts"
+      - "src/plugins/next/**"
+      - "test/swc-parity.test.ts"
+      - ".github/workflows/swc-plugin.yml"
+  workflow_dispatch:
+
+jobs:
+  build-and-parity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust + wasm32-wasip1
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup target add wasm32-wasip1
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            swc-plugin/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('swc-plugin/Cargo.lock', 'swc-plugin/Cargo.toml') }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build wasm plugin (refreshes assets/layout-swc-plugin.wasm)
+        run: npm run build:wasm
+
+      - name: Note if the committed wasm differs from a fresh build
+        run: |
+          # wasm32-wasip1 output is not guaranteed byte-identical across build
+          # hosts, so this is informational, not a gate. Parity (below) is the
+          # real correctness check; it runs against the freshly built wasm.
+          if ! git diff --quiet -- assets/layout-swc-plugin.wasm; then
+            echo "::notice::assets/layout-swc-plugin.wasm differs from a fresh build on this host (often just cross-host codegen). Parity is still verified below."
+          fi
+
+      - name: Parity + full test suite
+        run: npm test

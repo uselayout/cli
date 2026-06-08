@@ -17,6 +17,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { swcPluginEntry, swcTaggingEnabled } from "./swc.js";
 
 type WebpackRule = {
   test: RegExp;
@@ -38,6 +39,7 @@ export interface NextConfigLike {
     config: WebpackConfigLike,
     options: WebpackOptions
   ) => WebpackConfigLike;
+  experimental?: { swcPlugins?: unknown[]; [key: string]: unknown };
   [key: string]: unknown;
 }
 
@@ -126,43 +128,61 @@ function isAppRouter(root: string): boolean {
 
 let turbopackWarned = false;
 let appRouterWarned = false;
+let swcActiveLogged = false;
 
 export default function withLayout(
   nextConfig: NextConfigLike = {}
 ): NextConfigLike {
-  // Turbopack (`next dev --turbo`, default in newer Next) ignores the
-  // `webpack()` hook, so the dev tagging below never runs and layout Live
-  // would silently fail to resolve elements. Make that explicit once
-  // rather than silent. Native Turbopack/SWC tagging is tracked separately.
-  if (process.env.TURBOPACK && !turbopackWarned) {
+  const root = process.cwd();
+  const appRouter = isAppRouter(root);
+  // Next sets NODE_ENV=development for `next dev`, production for `next build`.
+  // Keep tagging dev-only, matching transform.ts's shouldTransform().
+  const isDev = process.env.NODE_ENV !== "production";
+  // Native SWC tagging (App Router + Turbopack). Opt-in via LAYOUT_LIVE_SWC=1;
+  // null when disabled or the prebuilt wasm is absent. See ./swc.ts ABI note.
+  const swcEntry =
+    appRouter && isDev ? swcPluginEntry(root) : null;
+
+  // Turbopack (`next dev --turbo`) ignores the `webpack()` hook. With the
+  // native SWC plugin active that's fine — it runs in Next's own pipeline. Only
+  // warn when there is NO SWC path to cover it (Pages Router under Turbopack).
+  if (process.env.TURBOPACK && !swcEntry && !turbopackWarned) {
     turbopackWarned = true;
     console.warn(
       "[@layoutdesign/context] Turbopack detected — layout Live source " +
         "tagging needs webpack. Run `next dev` without --turbo for the " +
-        "visual-edit loop (Turbopack support is tracked, not yet shipped)."
+        "visual-edit loop (or enable native SWC tagging: LAYOUT_LIVE_SWC=1)."
     );
   }
-  return {
+
+  const out: NextConfigLike = {
     ...nextConfig,
     webpack(config: WebpackConfigLike, options: WebpackOptions) {
       if (options.dev) {
         // Advertise this project's dev server for deterministic `live` binding.
-        writeNextDevInfo(process.cwd());
+        writeNextDevInfo(root);
         // App Router: the Babel tagging pass makes Next misclassify React
         // Server Components as client modules (a server component that exports
-        // `metadata` then fails to build). Do NOT inject it on App Router —
-        // that breaks the build, which is worse than no tagging. Source
-        // tagging for App Router is moving to a native SWC plugin. dev-info is
-        // still written above so `live` / the in-app switcher can bind.
-        if (isAppRouter(process.cwd())) {
-          if (!appRouterWarned) {
+        // `metadata` then fails to build). NEVER inject the Babel rule on App
+        // Router. Tagging there is handled by the native SWC plugin (below) when
+        // opted-in; otherwise it's paused (app still builds normally).
+        if (appRouter) {
+          if (swcEntry) {
+            if (!swcActiveLogged) {
+              swcActiveLogged = true;
+              console.log(
+                "[@layoutdesign/context] App Router — native SWC source " +
+                  "tagging active (works under webpack and Turbopack)."
+              );
+            }
+          } else if (!appRouterWarned) {
             appRouterWarned = true;
             console.warn(
               "[@layoutdesign/context] Next App Router detected — element " +
-                "source tagging is paused here (the Babel pass conflicts with " +
-                "React Server Components; native SWC tagging is in progress). " +
-                "Your app builds normally; elements aren't editable in Layout " +
-                "Live yet."
+                "source tagging is paused (the Babel pass conflicts with React " +
+                "Server Components). Enable the native SWC plugin with " +
+                "LAYOUT_LIVE_SWC=1, or use it in a Pages Router / Vite project. " +
+                "Your app builds normally regardless."
             );
           }
         } else {
@@ -186,4 +206,27 @@ export default function withLayout(
         : config;
     },
   };
+
+  // App Router native tagging: add our plugin to experimental.swcPlugins,
+  // preserving any the user already configured. This is a top-level config key
+  // (not inside webpack()), and applies under Turbopack too.
+  if (swcEntry) {
+    const exp: { swcPlugins?: unknown[]; [k: string]: unknown } = {
+      ...(nextConfig.experimental ?? {}),
+    };
+    const existing = Array.isArray(exp.swcPlugins) ? exp.swcPlugins : [];
+    exp.swcPlugins = [...existing, swcEntry];
+    out.experimental = exp;
+  }
+
+  return out;
+}
+
+/** Exposed for diagnostics/preflight: is native SWC tagging available + on? */
+export function swcTaggingReady(root: string): boolean {
+  return (
+    swcTaggingEnabled() &&
+    isAppRouter(root) &&
+    swcPluginEntry(root) !== null
+  );
 }
