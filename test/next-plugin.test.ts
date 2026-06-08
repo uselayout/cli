@@ -14,6 +14,17 @@ process.env.LAYOUT_LIVE_NO_DEVINFO = "1";
 
 import withLayout from "../src/plugins/next/index.js";
 
+/** Write a fake node_modules/next@<version> into a temp project so the SWC
+ *  ABI guard can resolve the host Next version. */
+async function fakeNext(dir: string, version: string): Promise<void> {
+  const nm = path.join(dir, "node_modules", "next");
+  await fs.mkdir(nm, { recursive: true });
+  await fs.writeFile(
+    path.join(nm, "package.json"),
+    JSON.stringify({ name: "next", version })
+  );
+}
+
 function fakeWebpackCtx() {
   return {
     config: { module: { rules: [] as unknown[] } },
@@ -51,9 +62,10 @@ test("does NOT add the Babel rule on App Router (would break RSC)", async () => 
   }
 });
 
-test("App Router + LAYOUT_LIVE_SWC=1: injects experimental.swcPlugins, no Babel rule", async () => {
+test("App Router + LAYOUT_LIVE_SWC=1 on a supported Next: injects swcPlugins, no Babel rule", async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "next-swc-"));
   await fs.mkdir(path.join(dir, "app"), { recursive: true });
+  await fakeNext(dir, "15.5.4"); // swc_core 35 → matches the shipped wasm
   const prevCwd = process.cwd();
   const prevSwc = process.env.LAYOUT_LIVE_SWC;
   process.chdir(dir);
@@ -99,9 +111,58 @@ test("App Router without opt-in: no swcPlugins (default-safe, no breakage)", asy
   }
 });
 
+test("guarded mode on an UNSUPPORTED Next: skips injection (no hard fail)", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "next-swc-bad-"));
+  await fs.mkdir(path.join(dir, "app"), { recursive: true });
+  await fakeNext(dir, "16.2.7"); // swc_core 57 ≠ 35 → would break the build
+  const prevCwd = process.cwd();
+  const prevSwc = process.env.LAYOUT_LIVE_SWC;
+  process.chdir(dir);
+  process.env.LAYOUT_LIVE_SWC = "1";
+  process.env.LAYOUT_LIVE_NO_DEVINFO = "1";
+  try {
+    const cfg = withLayout({});
+    // The guard skips injection → Next never tries to load a mismatched wasm,
+    // so the build can't break. (The skip REASON is unit-tested in
+    // swc-plugin.test.ts; the user-facing warning text is cosmetic.)
+    assert.equal(cfg.experimental, undefined);
+    // Babel rule still not injected on App Router either.
+    const out = cfg.webpack!({ module: { rules: [] } }, { dev: true });
+    assert.equal(out.module!.rules!.length, 0);
+  } finally {
+    process.chdir(prevCwd);
+    if (prevSwc === undefined) delete process.env.LAYOUT_LIVE_SWC;
+    else process.env.LAYOUT_LIVE_SWC = prevSwc;
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("force mode on an unsupported Next: injects anyway (explicit risk)", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "next-swc-force-"));
+  await fs.mkdir(path.join(dir, "app"), { recursive: true });
+  await fakeNext(dir, "16.2.7");
+  const prevCwd = process.cwd();
+  const prevSwc = process.env.LAYOUT_LIVE_SWC;
+  process.chdir(dir);
+  process.env.LAYOUT_LIVE_SWC = "force";
+  process.env.LAYOUT_LIVE_NO_DEVINFO = "1";
+  try {
+    const cfg = withLayout({});
+    const plugins = cfg.experimental?.swcPlugins as Array<[string, unknown]>;
+    assert.ok(Array.isArray(plugins) && plugins.length === 1);
+    assert.match(plugins[0]![0], /^@layoutdesign\/context\/swc-plugin\.wasm$/);
+  } finally {
+    process.chdir(prevCwd);
+    if (prevSwc === undefined) delete process.env.LAYOUT_LIVE_SWC;
+    else process.env.LAYOUT_LIVE_SWC = prevSwc;
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("SWC injection preserves a user's existing experimental.swcPlugins", async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "next-swc-merge-"));
   await fs.mkdir(path.join(dir, "src", "app"), { recursive: true });
+  await fakeNext(dir, "15.5.0");
   const prevCwd = process.cwd();
   const prevSwc = process.env.LAYOUT_LIVE_SWC;
   process.chdir(dir);

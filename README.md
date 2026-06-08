@@ -67,6 +67,7 @@ visually:
 |------|-------------|
 | `get-selected-element` | Returns the element currently selected in Live. Use when the user says "this" or "that one". Returns `{ running: false }` if Live isn't running. |
 | `get-recent-visual-edits` | Recent class/token/inline-style edits. Reads Live's socket when running; falls back to the on-disk `.layout/live/recent-edits.json` log otherwise — so it's useful even when Live is closed. |
+| `get-pending-requests` | Free-text changes the user pinned to elements/regions in Live ("make this the primary CTA"). Reads Live's socket when running; falls back to `.layout/live/requests.json` otherwise. Use when the user says "apply my requests" or "do the things I flagged". |
 | `lock-file` | Reserves exclusive write access to a file before editing, so Claude and Live don't clobber each other. |
 | `unlock-file` | Releases a previously-acquired lock. |
 

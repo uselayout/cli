@@ -1,8 +1,8 @@
 /**
- * Tool registration + module-shape contract for the 4 new Live tools.
+ * Tool registration + module-shape contract for the Live tools.
  *
- * Asserts each module exports the same surface as the existing 14 tools
- * (name / description / inputSchema / handler) and that all four register on
+ * Asserts each module exports the same surface as the other tools
+ * (name / description / inputSchema / handler) and that they all register on
  * a real McpServer without throwing.
  */
 import { test } from "node:test";
@@ -11,12 +11,14 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 import * as getSelectedElement from "../src/mcp/tools/get-selected-element.js";
 import * as getRecentVisualEdits from "../src/mcp/tools/get-recent-visual-edits.js";
+import * as getPendingRequests from "../src/mcp/tools/get-pending-requests.js";
 import * as lockFile from "../src/mcp/tools/lock-file.js";
 import * as unlockFile from "../src/mcp/tools/unlock-file.js";
 
 const modules = [
   { mod: getSelectedElement, expected: "get-selected-element" },
   { mod: getRecentVisualEdits, expected: "get-recent-visual-edits" },
+  { mod: getPendingRequests, expected: "get-pending-requests" },
   { mod: lockFile, expected: "lock-file" },
   { mod: unlockFile, expected: "unlock-file" },
 ];
@@ -36,7 +38,7 @@ test("each new tool exports name/description/inputSchema/handler", () => {
   }
 });
 
-test("all 4 tools register on a real McpServer without throwing", () => {
+test("all Live tools register on a real McpServer without throwing", () => {
   const server = new McpServer({ name: "test", version: "0.7.0" });
   assert.doesNotThrow(() => {
     for (const { mod } of modules) {
@@ -45,7 +47,7 @@ test("all 4 tools register on a real McpServer without throwing", () => {
   });
 });
 
-test("server.ts registers exactly the 4 new tools alongside the existing ones", async () => {
+test("server.ts registers the Live tools alongside the existing ones", async () => {
   const src = await import("node:fs").then((fs) =>
     fs.readFileSync(new URL("../src/mcp/server.ts", import.meta.url), "utf8")
   );

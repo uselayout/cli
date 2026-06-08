@@ -41,6 +41,7 @@ To open it (or tell the user to), run \`npx @layoutdesign/context live\` from th
 
 When relevant, use these MCP tools:
 - \`get-recent-visual-edits\` — recent class/token changes
+- \`get-pending-requests\` — free-text changes the user flagged on elements/regions in Live (use when they say "apply my requests" or "do the things I flagged")
 - \`get-selected-element\` — element currently selected in Live (use when the user says "this" or "that one")
 - \`lock-file\` / \`unlock-file\` — coordinate file access before editing
 
