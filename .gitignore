@@ -7,3 +7,6 @@ swc-plugin/target/
 
 # SWC on-disk transform cache (created when @swc/core runs in tests)
 .swc/
+
+# npm pack artifacts
+*.tgz

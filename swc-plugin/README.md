@@ -42,21 +42,42 @@ A wasm SWC plugin is locked to the `swc_core` version it was built against,
 which must be ABI-compatible with the SWC bundled in the user's Next.js. A
 mismatch is a **hard build failure**, not a graceful degrade.
 
-- Current pin: `swc_core = "68"` (see [`Cargo.toml`](./Cargo.toml)), verified to
-  load in `@swc/core` 1.15.40.
-- When a new Next major bumps its internal SWC, the pin may need updating and
-  the wasm rebuilding. The CI job (`.github/workflows/swc-plugin.yml`) rebuilds
-  and re-runs parity on every change to guard against silent breakage.
+- Current pin: `swc_core = "=35.0.0"` (see [`Cargo.toml`](./Cargo.toml)) — the
+  version **Next 15.5.x bundles** (from Next's own `Cargo.lock`). Parity tests
+  run against `@swc/core` 1.13.5 (same ABI range).
+- **Validated end-to-end on Next 15.5.19**: with `LAYOUT_LIVE_SWC=1`, source
+  tags serve correctly under BOTH `next dev` and `next dev --turbopack`, a
+  server component exporting `metadata` builds and renders, and `next build`
+  (production) is unaffected (the plugin is dev-only).
+- When a new Next major bumps its internal SWC, re-pin `swc_core`, rebuild the
+  wasm, and bump the `@swc/core` devDependency to a matching ABI. The CI job
+  (`.github/workflows/swc-plugin.yml`) rebuilds + re-runs parity to guard
+  against silent breakage.
 
-Because of this, the native path is **opt-in** (`LAYOUT_LIVE_SWC=1`) until the
-shipped wasm's ABI is verified across the Next versions we support. Default-off
-preserves the safe behaviour (App Router tagging paused, app builds normally).
+Because the ABI is Next-version-specific, the native path is **opt-in**
+(`LAYOUT_LIVE_SWC=1`) and default-off until verified across the Next range we
+support. Default-off preserves the safe behaviour (App Router tagging paused,
+app builds normally).
 
 ```bash
 # App Router, with Turbopack, once opted-in:
 LAYOUT_LIVE_SWC=1 next dev --turbopack
 ```
 
+## Plugin entry: a specifier, not a path
+
+`experimental.swcPlugins` entries must be a **node-resolvable specifier**, not
+an absolute filesystem path: Turbopack resolves them through its module
+resolver and rejects absolute paths (`Module not found`). The wasm is therefore
+exposed via package `exports` as `@layoutdesign/context/swc-plugin.wasm`, and
+`swcPluginEntry` passes that specifier (webpack resolves it too).
+
+The host also passes the filename in different shapes — webpack gives an
+ABSOLUTE path, Turbopack a PROJECT-RELATIVE one — so the plugin normalises both
+to the same `data-layout-source-file` value (see `make_relative` in
+[`src/lib.rs`](./src/lib.rs)).
+
 Wiring lives in [`src/plugins/next/swc.ts`](../src/plugins/next/swc.ts)
-(`swcPluginEntry`) and [`src/plugins/next/index.ts`](../src/plugins/next/index.ts)
-(`withLayout` injects `experimental.swcPlugins`).
+(`swcPluginEntry`, `SWC_PLUGIN_SPECIFIER`) and
+[`src/plugins/next/index.ts`](../src/plugins/next/index.ts) (`withLayout` injects
+`experimental.swcPlugins`).

@@ -12,17 +12,21 @@
   "types": "./dist/src/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/src/index.d.ts",
       "import": "./dist/src/index.js",
-      "types": "./dist/src/index.d.ts"
+      "default": "./dist/src/index.js"
     },
     "./vite-plugin": {
+      "types": "./dist/src/plugins/vite/index.d.ts",
       "import": "./dist/src/plugins/vite/index.js",
-      "types": "./dist/src/plugins/vite/index.d.ts"
+      "default": "./dist/src/plugins/vite/index.js"
     },
     "./next-plugin": {
+      "types": "./dist/src/plugins/next/index.d.ts",
       "import": "./dist/src/plugins/next/index.js",
-      "types": "./dist/src/plugins/next/index.d.ts"
-    }
+      "default": "./dist/src/plugins/next/index.js"
+    },
+    "./swc-plugin.wasm": "./assets/layout-swc-plugin.wasm"
   },
   "files": [
     "dist",
@@ -76,7 +80,7 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
-    "@swc/core": "^1.15.40",
+    "@swc/core": "1.13.5",
     "@types/babel__generator": "^7.27.0",
     "@types/babel__traverse": "^7.28.0",
     "@types/node": "^22.13.10",

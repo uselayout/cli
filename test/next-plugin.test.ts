@@ -65,7 +65,7 @@ test("App Router + LAYOUT_LIVE_SWC=1: injects experimental.swcPlugins, no Babel 
     const plugins = cfg.experimental?.swcPlugins as Array<[string, unknown]>;
     assert.ok(Array.isArray(plugins), "experimental.swcPlugins is set");
     assert.equal(plugins.length, 1);
-    assert.match(plugins[0]![0], /layout-swc-plugin\.wasm$/);
+    assert.match(plugins[0]![0], /^@layoutdesign\/context\/swc-plugin\.wasm$/);
     assert.deepEqual(plugins[0]![1], {
       projectRoot: process.cwd(),
       dev: true,
@@ -115,7 +115,7 @@ test("SWC injection preserves a user's existing experimental.swcPlugins", async 
     const plugins = cfg.experimental?.swcPlugins as Array<[string, unknown]>;
     assert.equal(plugins.length, 2);
     assert.deepEqual(plugins[0], userPlugin); // user's first, ours appended
-    assert.match(plugins[1]![0], /layout-swc-plugin\.wasm$/);
+    assert.match(plugins[1]![0], /^@layoutdesign\/context\/swc-plugin\.wasm$/);
     // Other experimental keys preserved.
     assert.equal(cfg.experimental?.serverActions, true);
   } finally {
