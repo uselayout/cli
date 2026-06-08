@@ -1,3 +1,9 @@
 node_modules/
 dist/
 .DS_Store
+
+# Rust SWC plugin build artifacts (the prebuilt .wasm is committed in assets/)
+swc-plugin/target/
+
+# SWC on-disk transform cache (created when @swc/core runs in tests)
+.swc/

@@ -16,6 +16,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { execFileSync } from "node:child_process";
 import chalk from "chalk";
+import { swcTaggingReady } from "../plugins/next/index.js";
 
 const LAYOUT_PKG = "@layoutdesign/context";
 
@@ -492,14 +493,24 @@ export async function installLive(projectRoot: string): Promise<void> {
     // `next dev` throws on a config that references a missing module.
     ensureDependency(projectRoot);
     installPlugin(projectRoot, framework);
-    // The Next plugin is webpack-only; Turbopack silently bypasses it.
+    // The Babel (webpack) tagging path is bypassed by Turbopack, so strip
+    // `--turbopack` from `dev` — UNLESS native SWC tagging is active for this
+    // project, which runs inside Next's pipeline under Turbopack too. In that
+    // case Turbopack is fully supported and we leave the dev script alone.
     if (framework === "next") {
-      const fix = fixTurbopackDevScript(projectRoot);
-      if (fix.changed) {
+      if (swcTaggingReady(projectRoot)) {
         console.log(
           chalk.green("  ✓"),
-          `package.json: dev → "${fix.after}" ${chalk.dim("(Turbopack bypasses source tagging)")}`
+          `Native SWC tagging enabled ${chalk.dim("(App Router + Turbopack supported)")}`
         );
+      } else {
+        const fix = fixTurbopackDevScript(projectRoot);
+        if (fix.changed) {
+          console.log(
+            chalk.green("  ✓"),
+            `package.json: dev → "${fix.after}" ${chalk.dim("(Turbopack bypasses source tagging)")}`
+          );
+        }
       }
     }
   }
