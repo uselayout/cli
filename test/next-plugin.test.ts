@@ -42,6 +42,16 @@ test("preserves existing next config keys", () => {
   assert.equal(typeof cfg.webpack, "function");
 });
 
+test("always emits a turbopack config (Next 16 build needs it alongside webpack)", () => {
+  // Next 16 builds with Turbopack by default and hard-errors when a `webpack`
+  // config is present without a `turbopack` config. We always carry a webpack
+  // hook, so a turbopack config must always be present too; user settings merge.
+  const bare = withLayout({});
+  assert.ok(bare.turbopack, "turbopack config present");
+  const merged = withLayout({ turbopack: { root: "/x" } });
+  assert.equal((merged.turbopack as { root?: string }).root, "/x");
+});
+
 test("does NOT add the Babel rule on App Router (would break RSC)", async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "next-approuter-"));
   await fs.mkdir(path.join(dir, "app"), { recursive: true });
@@ -65,7 +75,7 @@ test("does NOT add the Babel rule on App Router (would break RSC)", async () => 
 test("App Router + LAYOUT_LIVE_SWC=1 on a supported Next: injects swcPlugins, no Babel rule", async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "next-swc-"));
   await fs.mkdir(path.join(dir, "app"), { recursive: true });
-  await fakeNext(dir, "15.5.4"); // swc_core 35 → matches the shipped wasm
+  await fakeNext(dir, "16.2.4"); // swc_core 57 -> matches the shipped wasm
   const prevCwd = process.cwd();
   const prevSwc = process.env.LAYOUT_LIVE_SWC;
   process.chdir(dir);
@@ -114,7 +124,7 @@ test("App Router without opt-in: no swcPlugins (default-safe, no breakage)", asy
 test("guarded mode on an UNSUPPORTED Next: skips injection (no hard fail)", async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "next-swc-bad-"));
   await fs.mkdir(path.join(dir, "app"), { recursive: true });
-  await fakeNext(dir, "16.2.7"); // swc_core 57 ≠ 35 → would break the build
+  await fakeNext(dir, "15.5.7"); // swc_core 35 != 57 -> would break the build
   const prevCwd = process.cwd();
   const prevSwc = process.env.LAYOUT_LIVE_SWC;
   process.chdir(dir);
@@ -140,7 +150,7 @@ test("guarded mode on an UNSUPPORTED Next: skips injection (no hard fail)", asyn
 test("force mode on an unsupported Next: injects anyway (explicit risk)", async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "next-swc-force-"));
   await fs.mkdir(path.join(dir, "app"), { recursive: true });
-  await fakeNext(dir, "16.2.7");
+  await fakeNext(dir, "15.5.7"); // mismatched ABI; force bypasses the guard
   const prevCwd = process.cwd();
   const prevSwc = process.env.LAYOUT_LIVE_SWC;
   process.chdir(dir);
@@ -162,7 +172,7 @@ test("force mode on an unsupported Next: injects anyway (explicit risk)", async 
 test("SWC injection preserves a user's existing experimental.swcPlugins", async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "next-swc-merge-"));
   await fs.mkdir(path.join(dir, "src", "app"), { recursive: true });
-  await fakeNext(dir, "15.5.0");
+  await fakeNext(dir, "16.2.0");
   const prevCwd = process.cwd();
   const prevSwc = process.env.LAYOUT_LIVE_SWC;
   process.chdir(dir);

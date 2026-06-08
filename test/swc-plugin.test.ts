@@ -73,9 +73,9 @@ test("nextSwcCore reads the installed Next and maps to swc_core", async () => {
     assert.equal(nextSwcCore(p155), 35);
     assert.equal(nextSwcCore(p162), 57);
     assert.equal(nextSwcCore(pNone), null); // no next installed
-    assert.equal(nextAbiMatches(p155), true); // 35 === WASM_TARGET_SWC_CORE
-    assert.equal(nextAbiMatches(p162), false);
-    assert.equal(WASM_TARGET_SWC_CORE, 35);
+    assert.equal(nextAbiMatches(p162), true); // 57 === WASM_TARGET_SWC_CORE
+    assert.equal(nextAbiMatches(p155), false); // 35 != 57 (skipped)
+    assert.equal(WASM_TARGET_SWC_CORE, 57);
   } finally {
     for (const d of [p155, p162, pNone])
       await fsp.rm(d, { recursive: true, force: true });
@@ -95,8 +95,8 @@ test("resolveSwcDecision: off unless opted-in", async () => {
   }
 });
 
-test("resolveSwcDecision guarded: injects on ABI match (Next 15.5.x)", async () => {
-  const p = await projectWithNext("15.5.0");
+test("resolveSwcDecision guarded: injects on ABI match (Next 16.2.x)", async () => {
+  const p = await projectWithNext("16.2.7");
   try {
     withEnv("1", () => {
       const d = resolveSwcDecision(p);
@@ -111,12 +111,12 @@ test("resolveSwcDecision guarded: injects on ABI match (Next 15.5.x)", async () 
 });
 
 test("resolveSwcDecision guarded: SKIPS on ABI mismatch (no hard fail)", async () => {
-  const p = await projectWithNext("16.2.7"); // swc_core 57 ≠ 35
+  const p = await projectWithNext("15.5.19"); // swc_core 35 != 57
   try {
     withEnv("1", () => {
       const d = resolveSwcDecision(p);
-      assert.equal(d.entry, null, "no entry → Next never loads a mismatched wasm");
-      assert.match(d.reason, /^abi-mismatch:16\.2\.7:swc_core57$/);
+      assert.equal(d.entry, null, "no entry -> Next never loads a mismatched wasm");
+      assert.match(d.reason, /^abi-mismatch:15\.5\.19:swc_core35$/);
     });
   } finally {
     await fsp.rm(p, { recursive: true, force: true });
@@ -137,7 +137,7 @@ test("resolveSwcDecision guarded: SKIPS on unknown Next version", async () => {
 });
 
 test("resolveSwcDecision force: injects regardless of Next version", async () => {
-  const p = await projectWithNext("16.2.7");
+  const p = await projectWithNext("15.5.19"); // mismatched ABI; force bypasses
   try {
     withEnv("force", () => {
       const d = resolveSwcDecision(p);
@@ -151,7 +151,7 @@ test("resolveSwcDecision force: injects regardless of Next version", async () =>
 });
 
 test("swcPluginEntry wrapper mirrors resolveSwcDecision().entry", async () => {
-  const p = await projectWithNext("15.5.3");
+  const p = await projectWithNext("16.2.3");
   try {
     withEnv("1", () => {
       const entry = swcPluginEntry(p);

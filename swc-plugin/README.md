@@ -42,17 +42,24 @@ A wasm SWC plugin is locked to the `swc_core` version it was built against,
 which must be ABI-compatible with the SWC bundled in the user's Next.js. A
 mismatch is a **hard build failure**, not a graceful degrade.
 
-- Current pin: `swc_core = "=35.0.0"` (see [`Cargo.toml`](./Cargo.toml)) — the
-  version **Next 15.5.x bundles** (from Next's own `Cargo.lock`). Parity tests
-  run against `@swc/core` 1.13.5 (same ABI range).
-- **Validated end-to-end on Next 15.5.19**: with `LAYOUT_LIVE_SWC=1`, source
-  tags serve correctly under BOTH `next dev` and `next dev --turbopack`, a
-  server component exporting `metadata` builds and renders, and `next build`
-  (production) is unaffected (the plugin is dev-only).
-- When a new Next major bumps its internal SWC, re-pin `swc_core`, rebuild the
-  wasm, and bump the `@swc/core` devDependency to a matching ABI. The CI job
-  (`.github/workflows/swc-plugin.yml`) rebuilds + re-runs parity to guard
-  against silent breakage.
+- Current pin: `swc_core = "=57.0.0"` (see [`Cargo.toml`](./Cargo.toml)) — the
+  version **Next 16.2.x bundles** (current stable; from Next's own `Cargo.lock`).
+  Parity tests run against `@swc/core` 1.15.0 (same ABI range).
+- **Validated end-to-end on Next 16.2.7**: with `LAYOUT_LIVE_SWC=1`, source tags
+  serve correctly under default Turbopack dev AND `next dev --webpack`, a server
+  component exporting `metadata` builds and renders, `next build` (production)
+  succeeds, and `live` binding works (dev-info written under Turbopack).
+- When Next bumps its internal SWC, re-pin `swc_core`, rebuild the wasm, bump the
+  `@swc/core` devDependency to a matching ABI, and add the Next minor to the
+  `NEXT_SWC_CORE` table in `src/plugins/next/swc.ts`. The CI job
+  (`.github/workflows/swc-plugin.yml`) rebuilds + re-runs parity to guard against
+  silent breakage.
+
+> **Next 16 build note:** Next 16 builds with Turbopack by default and errors if
+> a `webpack` config is present without a `turbopack` config. `withLayout`
+> always carries a webpack hook, so it also emits a (merged) `turbopack` config
+> to keep `next build` working. This applies to all Next 16 users, independent of
+> SWC opt-in.
 
 ### Version guard + modes
 
@@ -67,20 +74,20 @@ never a broken build.
 | Value | Behaviour |
 |-------|-----------|
 | unset / `0` | **off** — App Router tagging paused (default; no behaviour change) |
-| `1` | **guarded** — inject ONLY when the installed Next's swc_core matches the shipped wasm (today: Next 15.5.x). Other versions skip + warn. Safe: never breaks the build. |
+| `1` | **guarded** — inject ONLY when the installed Next's swc_core matches the shipped wasm (today: Next 16.2.x). Other versions skip + warn. Safe: never breaks the build. |
 | `force` | **forced** — inject regardless of the version guard. Explicit risk; for users who rebuilt the wasm for their own Next. |
 
 ```bash
-# App Router, with Turbopack, on a supported Next (15.5.x):
-LAYOUT_LIVE_SWC=1 next dev --turbopack
+# App Router, default Turbopack, on a supported Next (16.2.x):
+LAYOUT_LIVE_SWC=1 next dev
 ```
 
 Default stays off: even `=1` is safe (guarded), but leaving the native path
-opt-in keeps the zero-surprise default while the supported Next range is narrow.
-To widen support, ship additional wasms per swc_core ABI and select by Next
+opt-in keeps the zero-surprise default. To widen support beyond the single
+targeted Next minor, ship additional wasms per swc_core ABI and select by Next
 version (the `NEXT_SWC_CORE` table + `resolveSwcDecision` already centralise the
-logic). Validated end-to-end on Next 15.5.19; the guard skips 16.x (swc_core
-45/49/57) until a matching wasm ships.
+logic). Validated end-to-end on Next 16.2.7; the guard skips other minors
+(15.5→35, 16.0→45, 16.1→49) until a matching wasm ships.
 
 ## Plugin entry: a specifier, not a path
 
