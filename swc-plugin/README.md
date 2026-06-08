@@ -54,15 +54,33 @@ mismatch is a **hard build failure**, not a graceful degrade.
   (`.github/workflows/swc-plugin.yml`) rebuilds + re-runs parity to guard
   against silent breakage.
 
-Because the ABI is Next-version-specific, the native path is **opt-in**
-(`LAYOUT_LIVE_SWC=1`) and default-off until verified across the Next range we
-support. Default-off preserves the safe behaviour (App Router tagging paused,
-app builds normally).
+### Version guard + modes
+
+Because the ABI is Next-version-specific AND a mismatch is a hard build failure,
+`withLayout` PREDICTS compatibility from the installed Next version (a
+`major.minor → swc_core` table read from Next's own `Cargo.lock`) BEFORE Next
+tries to load the plugin. An incompatible Next is skipped with a clear warning,
+never a broken build.
+
+`LAYOUT_LIVE_SWC` modes:
+
+| Value | Behaviour |
+|-------|-----------|
+| unset / `0` | **off** — App Router tagging paused (default; no behaviour change) |
+| `1` | **guarded** — inject ONLY when the installed Next's swc_core matches the shipped wasm (today: Next 15.5.x). Other versions skip + warn. Safe: never breaks the build. |
+| `force` | **forced** — inject regardless of the version guard. Explicit risk; for users who rebuilt the wasm for their own Next. |
 
 ```bash
-# App Router, with Turbopack, once opted-in:
+# App Router, with Turbopack, on a supported Next (15.5.x):
 LAYOUT_LIVE_SWC=1 next dev --turbopack
 ```
+
+Default stays off: even `=1` is safe (guarded), but leaving the native path
+opt-in keeps the zero-surprise default while the supported Next range is narrow.
+To widen support, ship additional wasms per swc_core ABI and select by Next
+version (the `NEXT_SWC_CORE` table + `resolveSwcDecision` already centralise the
+logic). Validated end-to-end on Next 15.5.19; the guard skips 16.x (swc_core
+45/49/57) until a matching wasm ships.
 
 ## Plugin entry: a specifier, not a path
 

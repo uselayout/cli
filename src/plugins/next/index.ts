@@ -17,7 +17,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { swcPluginEntry, swcTaggingEnabled } from "./swc.js";
+import { resolveSwcDecision, swcMode } from "./swc.js";
 
 type WebpackRule = {
   test: RegExp;
@@ -130,6 +130,50 @@ let turbopackWarned = false;
 let appRouterWarned = false;
 let swcActiveLogged = false;
 
+const PFX = "[@layoutdesign/context]";
+
+/** The "App Router tagging is paused" message, tailored to WHY it's paused so
+ *  the user knows what to do (turn it on, pin Next, or force it). */
+function appRouterMessage(reason: string): string {
+  const base =
+    `${PFX} Next App Router detected — element source tagging is paused ` +
+    "(the Babel pass conflicts with React Server Components). ";
+  if (reason === "off") {
+    return (
+      base +
+      "Enable the native SWC plugin with LAYOUT_LIVE_SWC=1 (or use a Pages " +
+      "Router / Vite project). Your app builds normally regardless."
+    );
+  }
+  if (reason.startsWith("abi-mismatch")) {
+    const [, nextV, swc] = reason.split(":");
+    return (
+      base +
+      `Your Next ${nextV} bundles ${swc}, but the prebuilt native plugin ` +
+      "targets swc_core 35 (Next 15.5.x). Loading it would break the build, " +
+      "so it's skipped. Pin Next 15.5.x for native tagging, or set " +
+      "LAYOUT_LIVE_SWC=force to try anyway (at your own risk)."
+    );
+  }
+  if (reason.startsWith("abi-unknown")) {
+    const nextV = reason.split(":")[1];
+    return (
+      base +
+      `Couldn't match your Next ${nextV} to a known SWC ABI, so native ` +
+      "tagging is skipped (safer than risking a broken build). Set " +
+      "LAYOUT_LIVE_SWC=force to try anyway."
+    );
+  }
+  if (reason === "wasm-missing") {
+    return (
+      base +
+      "The prebuilt plugin wasm wasn't found in the installed package, so " +
+      "native tagging is unavailable."
+    );
+  }
+  return base + "Your app builds normally regardless.";
+}
+
 export default function withLayout(
   nextConfig: NextConfigLike = {}
 ): NextConfigLike {
@@ -138,20 +182,25 @@ export default function withLayout(
   // Next sets NODE_ENV=development for `next dev`, production for `next build`.
   // Keep tagging dev-only, matching transform.ts's shouldTransform().
   const isDev = process.env.NODE_ENV !== "production";
-  // Native SWC tagging (App Router + Turbopack). Opt-in via LAYOUT_LIVE_SWC=1;
-  // null when disabled or the prebuilt wasm is absent. See ./swc.ts ABI note.
-  const swcEntry =
-    appRouter && isDev ? swcPluginEntry(root) : null;
+  // Native SWC tagging (App Router + Turbopack). Opt-in via LAYOUT_LIVE_SWC=1
+  // (guarded: injects only when the installed Next's swc_core matches the
+  // shipped wasm) or `=force`. The version guard means a wrong Next gives a
+  // clean skip + warning here, never a hard build failure. See ./swc.ts.
+  const swcDecision =
+    appRouter && isDev
+      ? resolveSwcDecision(root)
+      : { entry: null, reason: "n/a" };
+  const swcEntry = swcDecision.entry;
 
-  // Turbopack (`next dev --turbo`) ignores the `webpack()` hook. With the
-  // native SWC plugin active that's fine — it runs in Next's own pipeline. Only
-  // warn when there is NO SWC path to cover it (Pages Router under Turbopack).
-  if (process.env.TURBOPACK && !swcEntry && !turbopackWarned) {
+  // Turbopack (`next dev --turbo`) ignores the `webpack()` hook. App Router is
+  // handled by the native SWC plugin (or its tailored skip message below), so
+  // only warn here for Pages Router under Turbopack, where the Babel path is
+  // the only option and Turbopack bypasses it.
+  if (process.env.TURBOPACK && !appRouter && !turbopackWarned) {
     turbopackWarned = true;
     console.warn(
-      "[@layoutdesign/context] Turbopack detected — layout Live source " +
-        "tagging needs webpack. Run `next dev` without --turbo for the " +
-        "visual-edit loop (or enable native SWC tagging: LAYOUT_LIVE_SWC=1)."
+      `${PFX} Turbopack detected — layout Live source tagging needs webpack. ` +
+        "Run `next dev` without --turbo for the visual-edit loop."
     );
   }
 
@@ -177,13 +226,7 @@ export default function withLayout(
             }
           } else if (!appRouterWarned) {
             appRouterWarned = true;
-            console.warn(
-              "[@layoutdesign/context] Next App Router detected — element " +
-                "source tagging is paused (the Babel pass conflicts with React " +
-                "Server Components). Enable the native SWC plugin with " +
-                "LAYOUT_LIVE_SWC=1, or use it in a Pages Router / Vite project. " +
-                "Your app builds normally regardless."
-            );
+            console.warn(appRouterMessage(swcDecision.reason));
           }
         } else {
           config.module ??= {};
@@ -222,11 +265,13 @@ export default function withLayout(
   return out;
 }
 
-/** Exposed for diagnostics/preflight: is native SWC tagging available + on? */
+/** Exposed for diagnostics/preflight: WILL native SWC tagging actually inject
+ *  for this project? True only when enabled, App Router, and the version guard
+ *  passes (or force) — i.e. when we'd really add the swcPlugins entry. */
 export function swcTaggingReady(root: string): boolean {
   return (
-    swcTaggingEnabled() &&
+    swcMode() !== "off" &&
     isAppRouter(root) &&
-    swcPluginEntry(root) !== null
+    resolveSwcDecision(root).entry !== null
   );
 }
