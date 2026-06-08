@@ -31,6 +31,7 @@ import * as scanProject from "./tools/scan-project.js";
 // Live integration tools (v0.7.0) — query the layout Live desktop app
 import * as getSelectedElement from "./tools/get-selected-element.js";
 import * as getRecentVisualEdits from "./tools/get-recent-visual-edits.js";
+import * as getPendingRequests from "./tools/get-pending-requests.js";
 import * as lockFile from "./tools/lock-file.js";
 import * as unlockFile from "./tools/unlock-file.js";
 
@@ -245,6 +246,13 @@ export async function startServer(): Promise<void> {
     getRecentVisualEdits.description,
     getRecentVisualEdits.inputSchema,
     getRecentVisualEdits.handler()
+  );
+
+  server.tool(
+    getPendingRequests.name,
+    getPendingRequests.description,
+    getPendingRequests.inputSchema,
+    getPendingRequests.handler()
   );
 
   server.tool(

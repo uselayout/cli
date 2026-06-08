@@ -14,6 +14,7 @@ import path from "node:path";
 
 import * as getSelectedElement from "../src/mcp/tools/get-selected-element.js";
 import * as getRecentVisualEdits from "../src/mcp/tools/get-recent-visual-edits.js";
+import * as getPendingRequests from "../src/mcp/tools/get-pending-requests.js";
 import { getLiveStatus } from "../src/mcp/tools/check-setup.js";
 
 let tmp: string;
@@ -101,6 +102,62 @@ test("get-recent-visual-edits returns empty set when no log exists", async () =>
     const out = parse(await getRecentVisualEdits.handler()({}));
     assert.equal(out.source, "edit-log-file");
     assert.deepEqual(out.edits, []);
+    assert.equal(out.truncated, false);
+  } finally {
+    process.chdir(tmp);
+    await fs.rm(empty, { recursive: true, force: true });
+  }
+});
+
+test("get-pending-requests falls back to the on-disk requests log", async () => {
+  const requests = [
+    {
+      id: "r1",
+      timestamp: "2026-05-16T10:00:00.000Z",
+      message: "make this the primary CTA",
+      target: { kind: "element", file: "src/Hero.tsx", line: 12, col: 4 },
+      status: "pending",
+    },
+    {
+      id: "r2",
+      timestamp: "2026-05-16T11:00:00.000Z",
+      message: "already handled",
+      target: { kind: "general" },
+      status: "done",
+    },
+  ];
+  await fs.mkdir(path.join(tmp, ".layout", "live"), { recursive: true });
+  await fs.writeFile(
+    path.join(tmp, ".layout", "live", "requests.json"),
+    JSON.stringify({ version: 1, requests }),
+    "utf8"
+  );
+
+  // Default: pending only, most recent first.
+  const pending = parse(await getPendingRequests.handler()({}));
+  assert.equal(pending.source, "requests-file");
+  assert.equal(pending.requests.length, 1);
+  assert.equal(pending.requests[0].id, "r1");
+
+  // includeDone surfaces both.
+  const all = parse(await getPendingRequests.handler()({ includeDone: true }));
+  assert.equal(all.requests.length, 2);
+
+  // File filter.
+  const filtered = parse(
+    await getPendingRequests.handler()({ file: "src/Hero.tsx" })
+  );
+  assert.equal(filtered.requests.length, 1);
+  assert.equal(filtered.requests[0].file ?? filtered.requests[0].target.file, "src/Hero.tsx");
+});
+
+test("get-pending-requests returns empty set when no log exists", async () => {
+  const empty = await fs.mkdtemp(path.join(os.tmpdir(), "layout-req-empty-"));
+  process.chdir(empty);
+  try {
+    const out = parse(await getPendingRequests.handler()({}));
+    assert.equal(out.source, "requests-file");
+    assert.deepEqual(out.requests, []);
     assert.equal(out.truncated, false);
   } finally {
     process.chdir(tmp);
