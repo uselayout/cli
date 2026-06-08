@@ -43,12 +43,30 @@ struct Config {
     dev: bool,
 }
 
-/// `path.relative(root, file)` then POSIX-joined, matching transform.ts. Both
-/// inputs are normalised to forward slashes first (Windows safety).
+/// Whether `file` is an absolute path (POSIX `/…` or Windows `C:\…`).
+fn is_absolute(file: &str) -> bool {
+    file.starts_with('/')
+        || file.starts_with('\\')
+        || file.as_bytes().get(1) == Some(&b':')
+}
+
+/// Project-relative POSIX path for `file`, matching transform.ts output.
+///
+/// The host passes the filename in different shapes:
+///   - webpack → ABSOLUTE (`/proj/app/page.tsx`)  → relativise against root.
+///   - Turbopack → already PROJECT-RELATIVE (`app/page.tsx`) → use as-is.
+/// Both must yield the same `app/page.tsx`.
 fn make_relative(root: &str, file: &str) -> String {
     let norm = |s: &str| s.replace('\\', "/");
-    let root = norm(root);
     let file = norm(file);
+    if !is_absolute(&file) {
+        // Turbopack: already relative to the project root.
+        return file
+            .trim_start_matches("./")
+            .trim_start_matches('/')
+            .to_string();
+    }
+    let root = norm(root);
     let root_parts: Vec<&str> = root
         .trim_end_matches('/')
         .split('/')
@@ -73,11 +91,11 @@ fn str_attr(name: &str, value: &str) -> JSXAttrOrSpread {
     JSXAttrOrSpread::JSXAttr(JSXAttr {
         span: DUMMY_SP,
         name: JSXAttrName::Ident(IdentName::new(name.into(), DUMMY_SP)),
-        value: Some(JSXAttrValue::Str(Str {
+        value: Some(JSXAttrValue::Lit(Lit::Str(Str {
             span: DUMMY_SP,
             value: value.into(),
             raw: None,
-        })),
+        }))),
     })
 }
 
@@ -117,7 +135,7 @@ fn has_literal_classname(opening: &JSXOpeningElement) -> bool {
             continue;
         }
         return match &attr.value {
-            Some(JSXAttrValue::Str(_)) => true,
+            Some(JSXAttrValue::Lit(Lit::Str(_))) => true,
             Some(JSXAttrValue::JSXExprContainer(c)) => match &c.expr {
                 JSXExpr::Expr(e) => match &**e {
                     Expr::Lit(Lit::Str(_)) => true,

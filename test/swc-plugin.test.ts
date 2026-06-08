@@ -8,6 +8,7 @@ import {
   resolveSwcPluginPath,
   swcTaggingEnabled,
   swcPluginEntry,
+  SWC_PLUGIN_SPECIFIER,
 } from "../src/plugins/next/swc.js";
 
 test("resolveSwcPluginPath returns the prebuilt wasm and it exists", () => {
@@ -32,7 +33,7 @@ test("swcTaggingEnabled follows LAYOUT_LIVE_SWC", () => {
   }
 });
 
-test("swcPluginEntry is null unless opted-in, then [wasm, {projectRoot, dev}]", () => {
+test("swcPluginEntry is null unless opted-in, then [specifier, {projectRoot, dev}]", () => {
   const prev = process.env.LAYOUT_LIVE_SWC;
   try {
     delete process.env.LAYOUT_LIVE_SWC;
@@ -40,7 +41,9 @@ test("swcPluginEntry is null unless opted-in, then [wasm, {projectRoot, dev}]", 
     process.env.LAYOUT_LIVE_SWC = "1";
     const entry = swcPluginEntry("/proj");
     assert.ok(entry, "entry when on");
-    assert.match(entry![0], /layout-swc-plugin\.wasm$/);
+    // Must be the node-resolvable specifier, NOT an absolute path (Turbopack).
+    assert.equal(entry![0], SWC_PLUGIN_SPECIFIER);
+    assert.match(entry![0], /^@layoutdesign\/context\/swc-plugin\.wasm$/);
     assert.deepEqual(entry![1], { projectRoot: "/proj", dev: true });
   } finally {
     if (prev === undefined) delete process.env.LAYOUT_LIVE_SWC;

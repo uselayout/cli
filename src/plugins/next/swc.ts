@@ -21,6 +21,14 @@ import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 
 /**
+ * Node-resolvable specifier for the wasm, exposed via package.json `exports`.
+ * Turbopack resolves swcPlugins entries through its module resolver and rejects
+ * absolute filesystem paths, so the entry MUST be a specifier (webpack resolves
+ * it too). See the App Router validation notes in swc-plugin/README.md.
+ */
+export const SWC_PLUGIN_SPECIFIER = "@layoutdesign/context/swc-plugin.wasm";
+
+/**
  * Absolute path to the prebuilt tagging wasm, or null if it isn't present in
  * the installed package. Compiled location is dist/src/plugins/next/swc.js, and
  * the wasm ships at <pkg>/assets/layout-swc-plugin.wasm (package.json "files").
@@ -57,12 +65,15 @@ export type SwcPluginEntry = [string, Record<string, unknown>];
 
 /**
  * The plugin entry to add to `experimental.swcPlugins`, or null when the path
- * is disabled or the wasm is missing. `projectRoot` is captured so the plugin
- * can emit project-relative `data-layout-source-file` values.
+ * is disabled or the wasm is missing. The first element is a node-resolvable
+ * specifier (not an absolute path) so Turbopack accepts it. `projectRoot` is
+ * captured so the plugin can emit project-relative `data-layout-source-file`
+ * values (webpack passes absolute filenames, Turbopack project-relative ones;
+ * the plugin normalises both).
  */
 export function swcPluginEntry(projectRoot: string): SwcPluginEntry | null {
   if (!swcTaggingEnabled()) return null;
-  const wasm = resolveSwcPluginPath();
-  if (!wasm) return null;
-  return [wasm, { projectRoot, dev: true }];
+  // Gate on the wasm actually being present on disk, but pass the specifier.
+  if (!resolveSwcPluginPath()) return null;
+  return [SWC_PLUGIN_SPECIFIER, { projectRoot, dev: true }];
 }

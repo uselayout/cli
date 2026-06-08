@@ -11,7 +11,12 @@ crate-type = ["cdylib"]
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-swc_core = { version = "68", features = [
+# ABI pin: must match the swc_core bundled in the user's Next.js. Next 15.5.x
+# ships swc_core 35 (verified: tags serve under `next dev` AND `next dev
+# --turbopack` on 15.5.19, with @swc/core 1.13.5 as the parity-test host). A
+# new Next major may change this — re-pin + rebuild, then update the @swc/core
+# devDependency to a matching ABI. See swc-plugin/README.md.
+swc_core = { version = "=35.0.0", features = [
   "ecma_plugin_transform",
   "ecma_visit",
   "ecma_ast",
