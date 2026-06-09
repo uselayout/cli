@@ -26,7 +26,8 @@
       "import": "./dist/src/plugins/next/index.js",
       "default": "./dist/src/plugins/next/index.js"
     },
-    "./swc-plugin.wasm": "./assets/layout-swc-plugin.wasm"
+    "./swc-plugin-35.wasm": "./assets/layout-swc-plugin-35.wasm",
+    "./swc-plugin-57.wasm": "./assets/layout-swc-plugin-57.wasm"
   },
   "files": [
     "dist",
@@ -41,7 +42,7 @@
   },
   "scripts": {
     "build": "tsc && mkdir -p dist/src/preview/static && cp src/preview/static/index.html dist/src/preview/static/index.html",
-    "build:wasm": "cd swc-plugin && cargo build --release --target wasm32-wasip1 && mkdir -p ../assets && cp target/wasm32-wasip1/release/layout_swc_plugin.wasm ../assets/layout-swc-plugin.wasm",
+    "build:wasm": "./swc-plugin/build.sh",
     "dev": "tsc --watch",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test test/*.test.ts",
