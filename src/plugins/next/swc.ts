@@ -7,45 +7,36 @@
  * pipeline instead, so it works under both `next dev` and `next dev --turbopack`
  * without disturbing RSC.
  *
- * The plugin is a prebuilt `.wasm` (see swc-plugin/, parity-tested against
- * transform.ts). End users need no Rust toolchain.
+ * Multi-ABI: a wasm SWC plugin is locked to the `swc_core` version it was built
+ * against, which MUST match the SWC bundled in the user's Next.js. Next bumps
+ * that almost every minor (15.5->35, 16.0->45, 16.1->49, 16.2->57). We ship one
+ * prebuilt wasm per SUPPORTED swc_core ABI and pick the matching one at config
+ * time from the installed Next version. A Next we don't have a wasm for is
+ * skipped (clean message), never a hard build failure.
  *
- * ABI caveat — the reason for the version guard below: a `.wasm` is locked to
- * the `swc_core` version it was built against, which MUST match the SWC bundled
- * in the user's Next.js. A mismatch is a HARD build failure
- * (`failed to invoke plugin`), not a graceful degrade. And Next bumps its
- * bundled swc_core almost every minor (15.5->35, 16.0->45, 16.1->49, 16.2->57),
- * so one prebuilt wasm only fits a narrow Next range. We therefore:
- *   1. ship a wasm built for a specific swc_core (WASM_TARGET_SWC_CORE), and
- *   2. PREDICT compatibility from the installed Next version BEFORE Next loads
- *      the plugin — injecting only on a match, so an incompatible Next gets a
- *      clean skip + warning instead of a broken build.
- * The path stays opt-in (`LAYOUT_LIVE_SWC=1`); `=force` bypasses the guard.
+ * Default is guarded-ON: once the plugin is wired, tagging auto-enables on a
+ * supported Next. `LAYOUT_LIVE_SWC=0` turns it off; `=force` bypasses the guard.
  */
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-/**
- * Node-resolvable specifier for the wasm, exposed via package.json `exports`.
- * Turbopack resolves swcPlugins entries through its module resolver and rejects
- * absolute filesystem paths, so the entry MUST be a specifier (webpack resolves
- * it too). See the App Router validation notes in swc-plugin/README.md.
- */
-export const SWC_PLUGIN_SPECIFIER = "@layoutdesign/context/swc-plugin.wasm";
+/** File name of the committed wasms: assets/<file>-<swcCore>.wasm. */
+const WASM_FILE_BASENAME = "layout-swc-plugin";
+/** Export subpath base (package.json "exports"): @layoutdesign/context/<sub>-<n>.wasm */
+const SPECIFIER_BASENAME = "swc-plugin";
 
 /**
- * The `swc_core` major the shipped wasm is built against (swc-plugin/Cargo.toml,
- * `=57.0.0`). Must equal the host Next's bundled swc_core for the plugin to
- * load. Currently corresponds to Next 16.2.x (current stable).
+ * The `swc_core` ABIs we ship a prebuilt wasm for. Each corresponds to a Next
+ * range (35 = Next 15.5.x, 57 = Next 16.2.x). Extend by adding a wasm via
+ * swc-plugin/build.sh and listing the ABI here.
  */
-export const WASM_TARGET_SWC_CORE = 57;
+export const SHIPPED_SWC_CORES: readonly number[] = [35, 57];
 
 /**
  * Known Next `major.minor` -> bundled `swc_core` major, read from Next's own
- * `Cargo.lock` per release tag. Lets us predict ABI compatibility before Next
- * tries to load the plugin. Unknown (newer/older) versions -> null -> treated as
- * incompatible (skip), never a hard failure. Extend as new Next versions ship.
+ * `Cargo.lock` per release tag. Lets us pick the right wasm (and skip Next
+ * versions we don't ship an ABI for) BEFORE Next tries to load the plugin.
  */
 const NEXT_SWC_CORE: Array<{ major: number; minor: number; swcCore: number }> = [
   { major: 15, minor: 3, swcCore: 21 },
@@ -56,18 +47,22 @@ const NEXT_SWC_CORE: Array<{ major: number; minor: number; swcCore: number }> = 
   { major: 16, minor: 2, swcCore: 57 },
 ];
 
-/**
- * Absolute path to the prebuilt tagging wasm, or null if it isn't present in
- * the installed package. Compiled location is dist/src/plugins/next/swc.js, and
- * the wasm ships at <pkg>/assets/layout-swc-plugin.wasm (package.json "files").
- */
-export function resolveSwcPluginPath(): string | null {
+/** Node-resolvable specifier for the wasm of a given swc_core ABI. Turbopack
+ *  resolves swcPlugins via its module resolver and rejects absolute paths, so
+ *  the entry MUST be a specifier (webpack resolves it too). */
+export function swcPluginSpecifier(swcCore: number): string {
+  return `@layoutdesign/context/${SPECIFIER_BASENAME}-${swcCore}.wasm`;
+}
+
+/** Absolute path to the shipped wasm for swc_core `swcCore`, or null if absent.
+ *  Compiled location is dist/src/plugins/next/swc.js; wasms ship at
+ *  <pkg>/assets/<basename>-<swcCore>.wasm (package.json "files"). */
+export function resolveSwcPluginPath(swcCore: number): string | null {
+  const file = `${WASM_FILE_BASENAME}-${swcCore}.wasm`;
   const candidates = [
-    // Installed/built: dist/src/plugins/next/swc.js -> <pkg>/assets/…
-    new URL("../../../../assets/layout-swc-plugin.wasm", import.meta.url),
-    // Defensive fallbacks for differing dist depths.
-    new URL("../../../assets/layout-swc-plugin.wasm", import.meta.url),
-    new URL("../../../../../assets/layout-swc-plugin.wasm", import.meta.url),
+    new URL(`../../../../assets/${file}`, import.meta.url),
+    new URL(`../../../assets/${file}`, import.meta.url),
+    new URL(`../../../../../assets/${file}`, import.meta.url),
   ];
   for (const u of candidates) {
     try {
@@ -80,18 +75,18 @@ export function resolveSwcPluginPath(): string | null {
   return null;
 }
 
-/** Tri-state opt-in. `1` = guarded-on (inject only on ABI match); `force` =
- *  inject regardless of the version guard (explicit risk); anything else off. */
+/** Tri-state. Default `guarded` (auto-on for supported Next); `off` disables;
+ *  `force` injects regardless of the version guard (explicit risk). */
 export type SwcMode = "off" | "guarded" | "force";
 
 export function swcMode(): SwcMode {
   const v = process.env.LAYOUT_LIVE_SWC;
+  if (v === "0" || v === "off" || v === "false") return "off";
   if (v === "force") return "force";
-  if (v === "1") return "guarded";
-  return "off";
+  return "guarded"; // default-on; `1` also lands here (back-compat)
 }
 
-/** Back-compat: is the native path requested at all (guarded or forced)? */
+/** Back-compat: is the native path enabled at all (guarded or forced)? */
 export function swcTaggingEnabled(): boolean {
   return swcMode() !== "off";
 }
@@ -120,66 +115,65 @@ export function nextSwcCore(projectRoot: string): number | null {
   return hit ? hit.swcCore : null;
 }
 
-/** Does the installed Next's bundled SWC match the shipped wasm's ABI? */
-export function nextAbiMatches(projectRoot: string): boolean {
-  return nextSwcCore(projectRoot) === WASM_TARGET_SWC_CORE;
+/** Do we ship a wasm whose ABI matches the installed Next? */
+export function nextAbiSupported(projectRoot: string): boolean {
+  const n = nextSwcCore(projectRoot);
+  return n != null && SHIPPED_SWC_CORES.includes(n);
 }
 
 /** A single `experimental.swcPlugins` entry: `[specifier, options]`. */
 export type SwcPluginEntry = [string, Record<string, unknown>];
 
 /**
- * Decision for whether to inject native tagging, plus a human reason for the
- * console. `entry` is null when we won't inject; `reason` explains why (shown by
- * withLayout). This keeps the (testable) policy in one place.
+ * Decision for whether to inject native tagging, plus a human reason. `entry`
+ * is null when we won't inject. Never returns an entry that would hard-fail the
+ * build: guarded mode injects only when we have a wasm for the host Next's ABI;
+ * force injects the newest shipped ABI regardless (explicit user risk).
  */
 export interface SwcDecision {
   entry: SwcPluginEntry | null;
   reason: string;
 }
 
-/**
- * Resolve the native-tagging decision for a project. Never returns an entry that
- * would hard-fail the build: in `guarded` mode it injects only when the Next ABI
- * matches the shipped wasm; in `force` mode it injects regardless (explicit
- * user risk); when off, nothing.
- */
 export function resolveSwcDecision(projectRoot: string): SwcDecision {
   const mode = swcMode();
   if (mode === "off") return { entry: null, reason: "off" };
 
-  if (!resolveSwcPluginPath()) {
+  const hostSwc = nextSwcCore(projectRoot);
+  const make = (swcCore: number, reason: string): SwcDecision | null =>
+    resolveSwcPluginPath(swcCore)
+      ? {
+          entry: [swcPluginSpecifier(swcCore), { projectRoot, dev: true }],
+          reason,
+        }
+      : null;
+
+  // Preferred: an exact ABI match for the installed Next.
+  if (hostSwc != null && SHIPPED_SWC_CORES.includes(hostSwc)) {
+    const d = make(hostSwc, `abi-match:${hostSwc}`);
+    if (d) return d;
+  }
+
+  if (mode === "force") {
+    // No matching wasm — gamble on the newest shipped ABI (user opted in).
+    const newest = Math.max(...SHIPPED_SWC_CORES);
+    const d = make(newest, `forced:${newest}`);
+    if (d) return d;
     return { entry: null, reason: "wasm-missing" };
   }
 
-  const entry: SwcPluginEntry = [
-    SWC_PLUGIN_SPECIFIER,
-    { projectRoot, dev: true },
-  ];
-
-  if (mode === "force") {
-    return { entry, reason: "forced" };
-  }
-
-  // guarded: predict ABI from the installed Next version.
-  const hostSwc = nextSwcCore(projectRoot);
-  if (hostSwc === WASM_TARGET_SWC_CORE) {
-    return { entry, reason: "abi-match" };
-  }
+  // guarded + unsupported/unknown → skip safely.
   const nextV = detectNextVersion(projectRoot) ?? "unknown";
   return {
     entry: null,
     reason:
       hostSwc == null
         ? `abi-unknown:${nextV}`
-        : `abi-mismatch:${nextV}:swc_core${hostSwc}`,
+        : `abi-unsupported:${nextV}:swc_core${hostSwc}`,
   };
 }
 
-/**
- * The plugin entry to add to `experimental.swcPlugins`, or null. Thin wrapper
- * over `resolveSwcDecision` for callers that only need the entry.
- */
+/** The plugin entry to add to `experimental.swcPlugins`, or null. */
 export function swcPluginEntry(projectRoot: string): SwcPluginEntry | null {
   return resolveSwcDecision(projectRoot).entry;
 }

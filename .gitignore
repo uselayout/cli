@@ -10,3 +10,5 @@ swc-plugin/target/
 
 # npm pack artifacts
 *.tgz
+swc-plugin/target-35/
+swc-plugin/target-57/

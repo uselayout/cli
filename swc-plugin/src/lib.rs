@@ -87,18 +87,47 @@ fn make_relative(root: &str, file: &str) -> String {
     out.join("/")
 }
 
+// The JSXAttrValue string-literal shape changed across swc_core versions:
+// swc_core >= ~45 uses `Str(Str)`; older (<= 35) used `Lit(Lit::Str)`. We build
+// this same source for BOTH ABIs (Next 15.5 = swc_core 35, Next 16.2 = swc_core
+// 57), so the variant is selected by the `legacy_jsx_attr` cargo feature (on for
+// the swc_core-35 build, off for 57). See swc-plugin/build.sh.
+
+#[cfg(feature = "legacy_jsx_attr")]
+fn jsx_string_value(value: &str) -> JSXAttrValue {
+    JSXAttrValue::Lit(Lit::Str(Str {
+        span: DUMMY_SP,
+        value: value.into(),
+        raw: None,
+    }))
+}
+
+#[cfg(not(feature = "legacy_jsx_attr"))]
+fn jsx_string_value(value: &str) -> JSXAttrValue {
+    JSXAttrValue::Str(Str {
+        span: DUMMY_SP,
+        value: value.into(),
+        raw: None,
+    })
+}
+
+/// Is this attribute value a plain string literal (across both swc_core ABIs)?
+fn is_jsx_string(v: &JSXAttrValue) -> bool {
+    #[cfg(feature = "legacy_jsx_attr")]
+    {
+        matches!(v, JSXAttrValue::Lit(Lit::Str(_)))
+    }
+    #[cfg(not(feature = "legacy_jsx_attr"))]
+    {
+        matches!(v, JSXAttrValue::Str(_))
+    }
+}
+
 fn str_attr(name: &str, value: &str) -> JSXAttrOrSpread {
     JSXAttrOrSpread::JSXAttr(JSXAttr {
         span: DUMMY_SP,
         name: JSXAttrName::Ident(IdentName::new(name.into(), DUMMY_SP)),
-        // NOTE: the JSXAttrValue string variant tracks the pinned swc_core:
-        // swc_core >= ~45 uses `Str(Str)`; older (<=35) used `Lit(Lit::Str)`.
-        // Currently pinned to swc_core 57 (Next 16.2.x).
-        value: Some(JSXAttrValue::Str(Str {
-            span: DUMMY_SP,
-            value: value.into(),
-            raw: None,
-        })),
+        value: Some(jsx_string_value(value)),
     })
 }
 
@@ -138,7 +167,7 @@ fn has_literal_classname(opening: &JSXOpeningElement) -> bool {
             continue;
         }
         return match &attr.value {
-            Some(JSXAttrValue::Str(_)) => true,
+            Some(v) if is_jsx_string(v) => true,
             Some(JSXAttrValue::JSXExprContainer(c)) => match &c.expr {
                 JSXExpr::Expr(e) => match &**e {
                     Expr::Lit(Lit::Str(_)) => true,

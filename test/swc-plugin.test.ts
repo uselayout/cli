@@ -1,6 +1,6 @@
 /**
- * Unit tests for the SWC plugin path resolver, opt-in modes, and the Next
- * version ABI guard (src/plugins/next/swc.ts).
+ * Unit tests for multi-ABI wasm resolution, opt-in modes (default guarded-ON),
+ * and the Next-version ABI auto-pick (src/plugins/next/swc.ts).
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -15,10 +15,10 @@ import {
   swcPluginEntry,
   resolveSwcDecision,
   nextSwcCore,
-  nextAbiMatches,
+  nextAbiSupported,
   detectNextVersion,
-  SWC_PLUGIN_SPECIFIER,
-  WASM_TARGET_SWC_CORE,
+  swcPluginSpecifier,
+  SHIPPED_SWC_CORES,
 } from "../src/plugins/next/swc.js";
 
 /** Make a temp project root with node_modules/next@<version> (or none). */
@@ -47,45 +47,70 @@ function withEnv(value: string | undefined, fn: () => void): void {
   }
 }
 
-test("resolveSwcPluginPath returns the prebuilt wasm and it exists", () => {
-  const p = resolveSwcPluginPath();
-  assert.ok(p, "wasm path resolved");
-  assert.match(p!, /assets\/layout-swc-plugin\.wasm$/);
-  assert.ok(fs.existsSync(p!), "wasm file is present on disk");
+test("ships a wasm for every supported swc_core ABI (35 + 57)", () => {
+  assert.deepEqual([...SHIPPED_SWC_CORES], [35, 57]);
+  for (const swc of SHIPPED_SWC_CORES) {
+    const p = resolveSwcPluginPath(swc);
+    assert.ok(p, `wasm for swc_core ${swc} resolved`);
+    assert.match(p!, new RegExp(`layout-swc-plugin-${swc}\\.wasm$`));
+    assert.ok(fs.existsSync(p!), `wasm ${swc} present on disk`);
+  }
 });
 
-test("swcMode maps LAYOUT_LIVE_SWC: off / guarded / force", () => {
-  withEnv(undefined, () => assert.equal(swcMode(), "off"));
-  withEnv("0", () => assert.equal(swcMode(), "off"));
+test("swcMode defaults to guarded-ON; 0/off disables; force bypasses", () => {
+  withEnv(undefined, () => assert.equal(swcMode(), "guarded")); // default ON
   withEnv("1", () => assert.equal(swcMode(), "guarded"));
+  withEnv("0", () => assert.equal(swcMode(), "off"));
+  withEnv("off", () => assert.equal(swcMode(), "off"));
   withEnv("force", () => assert.equal(swcMode(), "force"));
-  withEnv("true", () => assert.equal(swcMode(), "off")); // only '1'/'force'
-  withEnv("1", () => assert.equal(swcTaggingEnabled(), true));
-  withEnv(undefined, () => assert.equal(swcTaggingEnabled(), false));
+  withEnv(undefined, () => assert.equal(swcTaggingEnabled(), true));
+  withEnv("0", () => assert.equal(swcTaggingEnabled(), false));
 });
 
-test("nextSwcCore reads the installed Next and maps to swc_core", async () => {
+test("nextSwcCore maps the installed Next; nextAbiSupported gates on shipped ABIs", async () => {
   const p155 = await projectWithNext("15.5.19");
   const p162 = await projectWithNext("16.2.7");
+  const p160 = await projectWithNext("16.0.3"); // swc_core 45 — not shipped
   const pNone = await projectWithNext(null);
   try {
-    assert.equal(detectNextVersion(p155), "15.5.19");
     assert.equal(nextSwcCore(p155), 35);
     assert.equal(nextSwcCore(p162), 57);
-    assert.equal(nextSwcCore(pNone), null); // no next installed
-    assert.equal(nextAbiMatches(p162), true); // 57 === WASM_TARGET_SWC_CORE
-    assert.equal(nextAbiMatches(p155), false); // 35 != 57 (skipped)
-    assert.equal(WASM_TARGET_SWC_CORE, 57);
+    assert.equal(nextSwcCore(p160), 45);
+    assert.equal(nextSwcCore(pNone), null);
+    assert.equal(nextAbiSupported(p155), true); // 35 shipped
+    assert.equal(nextAbiSupported(p162), true); // 57 shipped
+    assert.equal(nextAbiSupported(p160), false); // 45 not shipped
+    assert.equal(detectNextVersion(p162), "16.2.7");
   } finally {
-    for (const d of [p155, p162, pNone])
+    for (const d of [p155, p162, p160, pNone])
       await fsp.rm(d, { recursive: true, force: true });
   }
 });
 
-test("resolveSwcDecision: off unless opted-in", async () => {
-  const p = await projectWithNext("15.5.19");
+test("default (unset): auto-picks the matching wasm per Next version", async () => {
+  const p155 = await projectWithNext("15.5.2");
+  const p162 = await projectWithNext("16.2.7");
   try {
     withEnv(undefined, () => {
+      const d155 = resolveSwcDecision(p155);
+      assert.equal(d155.entry![0], swcPluginSpecifier(35));
+      assert.equal(d155.reason, "abi-match:35");
+
+      const d162 = resolveSwcDecision(p162);
+      assert.equal(d162.entry![0], swcPluginSpecifier(57));
+      assert.equal(d162.reason, "abi-match:57");
+      assert.deepEqual(d162.entry![1], { projectRoot: p162, dev: true });
+    });
+  } finally {
+    await fsp.rm(p155, { recursive: true, force: true });
+    await fsp.rm(p162, { recursive: true, force: true });
+  }
+});
+
+test("LAYOUT_LIVE_SWC=0 disables even on a supported Next", async () => {
+  const p = await projectWithNext("16.2.7");
+  try {
+    withEnv("0", () => {
       const d = resolveSwcDecision(p);
       assert.equal(d.entry, null);
       assert.equal(d.reason, "off");
@@ -95,38 +120,23 @@ test("resolveSwcDecision: off unless opted-in", async () => {
   }
 });
 
-test("resolveSwcDecision guarded: injects on ABI match (Next 16.2.x)", async () => {
-  const p = await projectWithNext("16.2.7");
+test("guarded: SKIPS an unshipped Next ABI (no hard fail)", async () => {
+  const p = await projectWithNext("16.0.3"); // swc_core 45 — no wasm
   try {
-    withEnv("1", () => {
+    withEnv(undefined, () => {
       const d = resolveSwcDecision(p);
-      assert.ok(d.entry, "entry present on match");
-      assert.equal(d.entry![0], SWC_PLUGIN_SPECIFIER);
-      assert.deepEqual(d.entry![1], { projectRoot: p, dev: true });
-      assert.equal(d.reason, "abi-match");
+      assert.equal(d.entry, null, "no entry → Next never loads a mismatched wasm");
+      assert.match(d.reason, /^abi-unsupported:16\.0\.3:swc_core45$/);
     });
   } finally {
     await fsp.rm(p, { recursive: true, force: true });
   }
 });
 
-test("resolveSwcDecision guarded: SKIPS on ABI mismatch (no hard fail)", async () => {
-  const p = await projectWithNext("15.5.19"); // swc_core 35 != 57
-  try {
-    withEnv("1", () => {
-      const d = resolveSwcDecision(p);
-      assert.equal(d.entry, null, "no entry -> Next never loads a mismatched wasm");
-      assert.match(d.reason, /^abi-mismatch:15\.5\.19:swc_core35$/);
-    });
-  } finally {
-    await fsp.rm(p, { recursive: true, force: true });
-  }
-});
-
-test("resolveSwcDecision guarded: SKIPS on unknown Next version", async () => {
+test("guarded: SKIPS an unknown Next version", async () => {
   const p = await projectWithNext(null);
   try {
-    withEnv("1", () => {
+    withEnv(undefined, () => {
       const d = resolveSwcDecision(p);
       assert.equal(d.entry, null);
       assert.match(d.reason, /^abi-unknown:/);
@@ -136,14 +146,14 @@ test("resolveSwcDecision guarded: SKIPS on unknown Next version", async () => {
   }
 });
 
-test("resolveSwcDecision force: injects regardless of Next version", async () => {
-  const p = await projectWithNext("15.5.19"); // mismatched ABI; force bypasses
+test("force: injects the newest shipped ABI on an unshipped Next", async () => {
+  const p = await projectWithNext("16.0.3"); // 45 not shipped
   try {
     withEnv("force", () => {
       const d = resolveSwcDecision(p);
-      assert.ok(d.entry, "force bypasses the guard");
-      assert.equal(d.entry![0], SWC_PLUGIN_SPECIFIER);
-      assert.equal(d.reason, "forced");
+      assert.ok(d.entry, "force injects anyway");
+      assert.equal(d.entry![0], swcPluginSpecifier(57)); // newest shipped
+      assert.equal(d.reason, "forced:57");
     });
   } finally {
     await fsp.rm(p, { recursive: true, force: true });
@@ -151,12 +161,12 @@ test("resolveSwcDecision force: injects regardless of Next version", async () =>
 });
 
 test("swcPluginEntry wrapper mirrors resolveSwcDecision().entry", async () => {
-  const p = await projectWithNext("16.2.3");
+  const p = await projectWithNext("15.5.7");
   try {
-    withEnv("1", () => {
+    withEnv(undefined, () => {
       const entry = swcPluginEntry(p);
       assert.ok(entry);
-      assert.equal(entry![0], SWC_PLUGIN_SPECIFIER);
+      assert.equal(entry![0], swcPluginSpecifier(35));
     });
   } finally {
     await fsp.rm(p, { recursive: true, force: true });

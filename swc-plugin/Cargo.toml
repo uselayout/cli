@@ -8,6 +8,12 @@ description = "SWC source-tagging plugin for Layout Live (App Router / Turbopack
 [lib]
 crate-type = ["cdylib"]
 
+[features]
+# Selects the older JSXAttrValue::Lit(Lit::Str) shape used by swc_core <= 35
+# (Next 15.5). Off by default → Str(Str) for swc_core >= 45 (Next 16.x). The
+# build script (build.sh) pairs this with the matching swc_core version pin.
+legacy_jsx_attr = []
+
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

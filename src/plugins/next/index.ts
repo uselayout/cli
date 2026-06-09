@@ -133,36 +133,36 @@ let swcActiveLogged = false;
 
 const PFX = "[@layoutdesign/context]";
 
-/** The "App Router tagging is paused" message, tailored to WHY it's paused so
- *  the user knows what to do (turn it on, pin Next, or force it). */
+/** The "App Router tagging is paused" message, tailored to WHY so the user
+ *  knows what (if anything) to do. Native tagging is on by default; it only
+ *  pauses when explicitly disabled or when we don't ship a wasm for their Next. */
 function appRouterMessage(reason: string): string {
   const base =
-    `${PFX} Next App Router detected — element source tagging is paused ` +
-    "(the Babel pass conflicts with React Server Components). ";
+    `${PFX} Next App Router detected — element source tagging is paused. `;
   if (reason === "off") {
     return (
       base +
-      "Enable the native SWC plugin with LAYOUT_LIVE_SWC=1 (or use a Pages " +
-      "Router / Vite project). Your app builds normally regardless."
+      "It's disabled (LAYOUT_LIVE_SWC=0). Remove that to re-enable native " +
+      "tagging. Your app builds normally."
     );
   }
-  if (reason.startsWith("abi-mismatch")) {
+  if (reason.startsWith("abi-unsupported")) {
     const [, nextV, swc] = reason.split(":");
     return (
       base +
-      `Your Next ${nextV} bundles ${swc}, but the prebuilt native plugin ` +
-      "targets swc_core 35 (Next 15.5.x). Loading it would break the build, " +
-      "so it's skipped. Pin Next 15.5.x for native tagging, or set " +
-      "LAYOUT_LIVE_SWC=force to try anyway (at your own risk)."
+      `Your Next ${nextV} bundles ${swc}, which Layout doesn't ship a native ` +
+      "plugin for yet (supported: Next 15.5.x and 16.2.x). Skipped safely — " +
+      "your app builds normally. Pin a supported Next for native tagging, or " +
+      "set LAYOUT_LIVE_SWC=force to try anyway (at your own risk)."
     );
   }
   if (reason.startsWith("abi-unknown")) {
     const nextV = reason.split(":")[1];
     return (
       base +
-      `Couldn't match your Next ${nextV} to a known SWC ABI, so native ` +
-      "tagging is skipped (safer than risking a broken build). Set " +
-      "LAYOUT_LIVE_SWC=force to try anyway."
+      `Couldn't match your Next ${nextV} to a known SWC ABI, so native tagging ` +
+      "is skipped (safer than risking a broken build). Set LAYOUT_LIVE_SWC=" +
+      "force to try anyway."
     );
   }
   if (reason === "wasm-missing") {

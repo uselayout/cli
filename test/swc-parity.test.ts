@@ -1,5 +1,5 @@
 /**
- * Parity oracle: the Rust/Wasm SWC plugin (assets/layout-swc-plugin.wasm) must
+ * Parity oracle: the Rust/Wasm SWC plugin (assets/layout-swc-plugin-57.wasm, the @swc/core-1.15 ABI) must
  * tag the SAME elements with the SAME four attribute values as the Babel
  * `transform.ts`. Output *formatting* differs (Babel emits JSX, SWC lowers to
  * React.createElement), so parity is asserted on the SET of tagged elements:
@@ -33,7 +33,7 @@ const traverse = unwrapCallable(
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = "/project";
 const FILE = "/project/src/Hero.tsx";
-const WASM = path.resolve(HERE, "..", "assets", "layout-swc-plugin.wasm");
+const WASM = path.resolve(HERE, "..", "assets", "layout-swc-plugin-57.wasm");
 
 interface Tag {
   tag: string;
