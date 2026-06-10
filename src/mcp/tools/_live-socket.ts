@@ -43,15 +43,34 @@ export function liveSocketPath(projectRoot: string): string {
     : path.join(os.homedir(), ".layout", `live-${id}.sock`);
 }
 
-const CONNECT_TIMEOUT_MS = 1500;
-const REQUEST_TIMEOUT_MS = 3000;
+const DEFAULT_CONNECT_TIMEOUT_MS = 1500;
+const DEFAULT_REQUEST_TIMEOUT_MS = 3000;
+
+/** Positive-integer env override, falling back to `fallback` when missing/invalid. */
+function envTimeout(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (raw === undefined || raw.trim() === "") return fallback;
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+/** Connect timeout (ms); override with LAYOUT_LIVE_CONNECT_TIMEOUT_MS. */
+function connectTimeoutMs(): number {
+  return envTimeout("LAYOUT_LIVE_CONNECT_TIMEOUT_MS", DEFAULT_CONNECT_TIMEOUT_MS);
+}
+
+/** Per-request timeout (ms); override with LAYOUT_LIVE_REQUEST_TIMEOUT_MS. */
+function requestTimeoutMs(): number {
+  return envTimeout("LAYOUT_LIVE_REQUEST_TIMEOUT_MS", DEFAULT_REQUEST_TIMEOUT_MS);
+}
 
 /**
  * Connect to the running Live app for `projectRoot` (defaults to cwd).
  *
  * Returns `null` — never throws — when Live is not running. "Not running" is
  * any of: socket file absent (ENOENT), stale socket (ECONNREFUSED), or the
- * connection not completing within {@link CONNECT_TIMEOUT_MS}.
+ * connection not completing within the connect timeout
+ * (LAYOUT_LIVE_CONNECT_TIMEOUT_MS, default {@link DEFAULT_CONNECT_TIMEOUT_MS}).
  */
 export async function connectToLive(
   projectRoot?: string
@@ -73,7 +92,7 @@ export async function connectToLive(
       resolve(null);
     };
 
-    const timer = setTimeout(() => fail({ code: "ETIMEDOUT" } as NodeJS.ErrnoException), CONNECT_TIMEOUT_MS);
+    const timer = setTimeout(() => fail({ code: "ETIMEDOUT" } as NodeJS.ErrnoException), connectTimeoutMs());
 
     socket.once("error", (err) => {
       clearTimeout(timer);
@@ -141,7 +160,7 @@ function wrapSocket(socket: net.Socket): LiveConnection {
         const timer = setTimeout(() => {
           pending.delete(id);
           reject(new Error("Live request timed out"));
-        }, REQUEST_TIMEOUT_MS);
+        }, requestTimeoutMs());
         pending.set(id, {
           resolve: resolve as (v: unknown) => void,
           reject,
