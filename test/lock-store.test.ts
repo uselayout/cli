@@ -110,6 +110,24 @@ test("an expired lock is taken over with a warning", async () => {
   }
 });
 
+test("two simultaneous acquires on the same path: exactly one wins", async () => {
+  const [a, b] = await Promise.all([
+    acquireLock(tmp, { path: "src/F.tsx", ttlSeconds: 60, holder: "claude" }),
+    acquireLock(tmp, { path: "src/F.tsx", ttlSeconds: 60, holder: "live" }),
+  ]);
+  const wins = [a, b].filter((r) => r.acquired);
+  assert.equal(wins.length, 1, "exactly one of the two concurrent acquires won");
+
+  // The on-disk store holds exactly the winner's lock.
+  const locks = await readLocks(tmp);
+  const held = locks["src/F.tsx"];
+  assert.ok(held, "a lock is held");
+  const winner = wins[0]!;
+  if (winner.acquired) {
+    assert.equal(held!.lock_id, winner.lock_id);
+  }
+});
+
 test("lock-file / unlock-file handlers round-trip via cwd", async () => {
   process.chdir(tmp);
   const acquired = JSON.parse(
