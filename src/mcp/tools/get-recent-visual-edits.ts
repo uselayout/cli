@@ -1,14 +1,17 @@
 /**
  * MCP tool: get-recent-visual-edits
  *
- * Returns recent class/token/inline-style edits made by the user in layout
+ * Returns recent visual edits (class/token/inline-style/text plus media
+ * edits: attribute/element-swap/import/asset) made by the user in layout
  * Live. Reads from Live's socket when running; falls back to the on-disk
- * `.layout/live/recent-edits.json` log when Live is not running.
+ * `.layout/live/recent-edits.json` log when Live is not running. Shapes per
+ * the canonical contract in `src/live/schema.ts`.
  */
 import { z } from "zod";
-import { promises as fs } from "node:fs";
 import path from "node:path";
 import { connectToLive } from "./_live-socket.js";
+import { readLiveLog } from "./_live-log.js";
+import { VisualEditSchema, type VisualEdit } from "../../live/schema.js";
 
 export const name = "get-recent-visual-edits";
 
@@ -39,23 +42,15 @@ export const inputSchema = {
 
 type Input = { limit?: number; since?: string; file?: string };
 
-export interface VisualEdit {
-  id: string;
-  timestamp: string;
-  file: string;
-  line: number;
-  col: number;
-  component?: string;
-  property: string;
-  kind: "class" | "token" | "inline-style";
-  before: string;
-  after: string;
-}
+export type { VisualEdit } from "../../live/schema.js";
 
 interface EditsResult {
   source: "live-socket" | "edit-log-file";
   edits: VisualEdit[];
   truncated: boolean;
+  /** Only present when something needs the caller's attention (e.g. the
+   *  on-disk log is a newer schema version than this CLI understands). */
+  warnings?: string[];
 }
 
 const EDIT_LOG = path.join(".layout", "live", "recent-edits.json");
@@ -82,18 +77,30 @@ function applyFilters(
   return { edits: filtered.slice(0, limit), truncated };
 }
 
-async function readEditLog(projectRoot: string): Promise<VisualEdit[]> {
-  try {
-    const raw = await fs.readFile(path.join(projectRoot, EDIT_LOG), "utf8");
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) return parsed as VisualEdit[];
-    if (parsed && Array.isArray(parsed.edits)) {
-      return parsed.edits as VisualEdit[];
-    }
-    return [];
-  } catch {
-    return [];
-  }
+async function readEditLog(
+  projectRoot: string
+): Promise<{ edits: VisualEdit[]; warnings: string[] }> {
+  const { items, warnings } = await readLiveLog(
+    path.join(projectRoot, EDIT_LOG),
+    "edits",
+    VisualEditSchema,
+    "recent-edits.json"
+  );
+  return { edits: items, warnings };
+}
+
+async function readFromLog(
+  projectRoot: string,
+  input: Input
+): Promise<EditsResult> {
+  const { edits: all, warnings } = await readEditLog(projectRoot);
+  const { edits, truncated } = applyFilters(all, input);
+  return {
+    source: "edit-log-file",
+    edits,
+    truncated,
+    ...(warnings.length > 0 && { warnings }),
+  };
 }
 
 export function handler() {
@@ -121,16 +128,12 @@ export function handler() {
           truncated: Boolean(res?.truncated),
         };
       } catch {
-        const all = await readEditLog(projectRoot);
-        const { edits, truncated } = applyFilters(all, input);
-        result = { source: "edit-log-file", edits, truncated };
+        result = await readFromLog(projectRoot, input);
       } finally {
         live.close();
       }
     } else {
-      const all = await readEditLog(projectRoot);
-      const { edits, truncated } = applyFilters(all, input);
-      result = { source: "edit-log-file", edits, truncated };
+      result = await readFromLog(projectRoot, input);
     }
 
     return {

@@ -11,9 +11,10 @@
  * exactly which element/file:line to change.
  */
 import { z } from "zod";
-import { promises as fs } from "node:fs";
 import path from "node:path";
 import { connectToLive } from "./_live-socket.js";
+import { readLiveLog } from "./_live-log.js";
+import { LiveRequestSchema, type LiveRequest } from "../../live/schema.js";
 
 export const name = "get-pending-requests";
 
@@ -46,40 +47,15 @@ export const inputSchema = {
 
 type Input = { limit?: number; file?: string; includeDone?: boolean };
 
-export type RequestTarget =
-  | {
-      kind: "element";
-      file: string;
-      line: number;
-      col: number;
-      component?: string;
-      classList?: string;
-      box?: {
-        padding?: string;
-        margin?: string;
-        width?: string;
-        height?: string;
-      };
-    }
-  | {
-      kind: "region";
-      rect: { x: number; y: number; width: number; height: number };
-      nearest?: { file: string; line: number; col: number; component?: string };
-    }
-  | { kind: "general" };
-
-export interface LiveRequest {
-  id: string;
-  timestamp: string;
-  message: string;
-  target: RequestTarget;
-  status: "pending" | "done";
-}
+export type { LiveRequest, RequestTarget } from "../../live/schema.js";
 
 interface RequestsResult {
   source: "live-socket" | "requests-file";
   requests: LiveRequest[];
   truncated: boolean;
+  /** Only present when something needs the caller's attention (e.g. the
+   *  on-disk log is a newer schema version than this CLI understands). */
+  warnings?: string[];
 }
 
 const REQUESTS_LOG = path.join(".layout", "live", "requests.json");
@@ -112,18 +88,30 @@ function applyFilters(
   return { requests: filtered.slice(0, limit), truncated };
 }
 
-async function readRequestsLog(projectRoot: string): Promise<LiveRequest[]> {
-  try {
-    const raw = await fs.readFile(path.join(projectRoot, REQUESTS_LOG), "utf8");
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) return parsed as LiveRequest[];
-    if (parsed && Array.isArray(parsed.requests)) {
-      return parsed.requests as LiveRequest[];
-    }
-    return [];
-  } catch {
-    return [];
-  }
+async function readRequestsLog(
+  projectRoot: string
+): Promise<{ requests: LiveRequest[]; warnings: string[] }> {
+  const { items, warnings } = await readLiveLog(
+    path.join(projectRoot, REQUESTS_LOG),
+    "requests",
+    LiveRequestSchema,
+    "requests.json"
+  );
+  return { requests: items, warnings };
+}
+
+async function readFromLog(
+  projectRoot: string,
+  input: Input
+): Promise<RequestsResult> {
+  const { requests: all, warnings } = await readRequestsLog(projectRoot);
+  const { requests, truncated } = applyFilters(all, input);
+  return {
+    source: "requests-file",
+    requests,
+    truncated,
+    ...(warnings.length > 0 && { warnings }),
+  };
 }
 
 export function handler() {
@@ -151,16 +139,12 @@ export function handler() {
           truncated: Boolean(res?.truncated),
         };
       } catch {
-        const all = await readRequestsLog(projectRoot);
-        const { requests, truncated } = applyFilters(all, input);
-        result = { source: "requests-file", requests, truncated };
+        result = await readFromLog(projectRoot, input);
       } finally {
         live.close();
       }
     } else {
-      const all = await readRequestsLog(projectRoot);
-      const { requests, truncated } = applyFilters(all, input);
-      result = { source: "requests-file", requests, truncated };
+      result = await readFromLog(projectRoot, input);
     }
 
     return {
