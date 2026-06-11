@@ -133,7 +133,7 @@ export async function startServer(): Promise<void> {
     version: pkg.version,
   });
 
-  // Register all 14 tools
+  // Register design-system tools
   server.tool(
     getDesignSystem.name,
     getDesignSystem.description,
