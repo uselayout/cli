@@ -65,7 +65,12 @@ const LIVE_CONFIG = {
   exclude: [] as string[],
 };
 
-const LIVE_GITIGNORE = "recent-edits.*\nlocks.json\nconflicts.json\n";
+// Everything under .layout/live/ is per-machine runtime state (dev-info.json
+// with absolute paths/pid/port, locks, conflicts, edit + request logs, baseline
+// snapshots, handoff notes) EXCEPT config.json, which is shareable team config.
+// Use an allowlist so any new runtime file is ignored by default rather than a
+// denylist that rots (dev-info.json + handoff.md were both missed previously).
+const LIVE_GITIGNORE = "*\n!.gitignore\n!config.json\n";
 
 interface Changes {
   changed: boolean;
@@ -399,8 +404,14 @@ export function ensureLayoutLiveDir(projectRoot: string): Changes {
     changed = true;
   }
 
+  // Always overwrite the tool-managed .gitignore so existing installs with a
+  // stale/partial ignore list self-heal on the next run. config.json above is
+  // only written when absent, so user edits to it survive.
   const gitignoreFile = path.join(liveDir, ".gitignore");
-  if (!fs.existsSync(gitignoreFile)) {
+  const existingGitignore = fs.existsSync(gitignoreFile)
+    ? fs.readFileSync(gitignoreFile, "utf8")
+    : null;
+  if (existingGitignore !== LIVE_GITIGNORE) {
     fs.writeFileSync(gitignoreFile, LIVE_GITIGNORE);
     changed = true;
   }

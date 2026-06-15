@@ -75,7 +75,8 @@ function writeDevInfo(server: unknown, root: string): void {
         infoPath,
         JSON.stringify(
           {
-            projectRoot: root,
+            // No absolute projectRoot: transient per-machine hint file. Avoid
+            // leaking a local path if force-tracked. Live reads only `port`.
             url: `${protocol}://localhost:${port}`,
             port,
             pid: process.pid,

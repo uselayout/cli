@@ -136,8 +136,32 @@ test("creates .layout/live/ with config.json + .gitignore", async () => {
     path.join(tmp, ".layout", "live", ".gitignore"),
     "utf8"
   );
-  assert.match(gi, /recent-edits\.\*/);
-  assert.match(gi, /locks\.json/);
+  // Allowlist: ignore everything except the gitignore itself and the shareable
+  // config.json. Per-machine runtime (dev-info.json, locks, etc.) is ignored.
+  assert.equal(gi, "*\n!.gitignore\n!config.json\n");
+});
+
+test("rewrites a stale partial .gitignore on re-run, keeps edited config.json", async () => {
+  await writePkg({ vite: "5.0.0" });
+  const liveDir = path.join(tmp, ".layout", "live");
+  await fs.mkdir(liveDir, { recursive: true });
+  // Simulate an old install with the partial denylist and a user-edited config.
+  await fs.writeFile(
+    path.join(liveDir, ".gitignore"),
+    "recent-edits.*\nlocks.json\nconflicts.json\n"
+  );
+  await fs.writeFile(
+    path.join(liveDir, "config.json"),
+    JSON.stringify({ version: 1, snapToScale: false }) + "\n"
+  );
+
+  await installLive(tmp);
+
+  const gi = await fs.readFile(path.join(liveDir, ".gitignore"), "utf8");
+  assert.equal(gi, "*\n!.gitignore\n!config.json\n");
+  // User edits to config.json survive (only written when absent).
+  const cfg = JSON.parse(await fs.readFile(path.join(liveDir, "config.json"), "utf8"));
+  assert.equal(cfg.snapToScale, false);
 });
 
 test("appends the CLAUDE.md managed block, idempotently", async () => {
