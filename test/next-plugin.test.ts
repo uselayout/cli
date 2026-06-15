@@ -245,7 +245,6 @@ test("writes .layout/live/dev-info.json on first dev compile", async () => {
   process.chdir(dir);
   delete process.env.LAYOUT_LIVE_NO_DEVINFO;
   process.env.PORT = "3001";
-  const cwdInside = process.cwd();
   try {
     const cfg = withLayout({});
     cfg.webpack!({ module: { rules: [] } }, { dev: true });
@@ -254,13 +253,15 @@ test("writes .layout/live/dev-info.json on first dev compile", async () => {
       "utf8"
     );
     const info = JSON.parse(raw) as {
-      projectRoot: string;
+      projectRoot?: string;
       url: string;
       port: number;
     };
     assert.equal(info.port, 3001);
     assert.equal(info.url, "http://localhost:3001");
-    assert.equal(info.projectRoot, cwdInside);
+    // No absolute path is written: dev-info.json is a transient per-machine
+    // hint file and must never leak the local project path.
+    assert.equal(info.projectRoot, undefined);
   } finally {
     process.chdir(prevCwd);
     if (prevDisable === undefined) delete process.env.LAYOUT_LIVE_NO_DEVINFO;
