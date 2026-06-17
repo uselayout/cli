@@ -8,7 +8,7 @@ import {
   addFigmaMcpServer as sharedAddFigma,
   addPlaywrightMcpServer as sharedAddPlaywright,
 } from "./setup-utils.js";
-import { installLive } from "../install/live.js";
+import { installLive, detectFramework, isPluginWired } from "../install/live.js";
 import { fetchKitFromGallery } from "./fetch-kit.js";
 
 const MCP_CONFIG = {
@@ -440,15 +440,24 @@ export async function installCommand(
     addPlaywrightMcpServer();
   }
 
-  // --- 2b. layout Live (opt-in) ---
-  let wantLive = options.live ?? false;
-  if (options.live === undefined) {
-    wantLive = await confirm(
-      "  Set up layout Live? (build plugin + .layout/live/ + CLAUDE.md block)"
-    );
-  }
-  if (wantLive) {
-    await installLive(process.cwd());
+  // --- 2b. layout Live (opt-in; only relevant for Vite/Next projects) ---
+  // The MCP install above gives the agent design-system context, but Live
+  // editing needs a SEPARATE step: the build plugin that emits source tags.
+  // Conflating the two is the #1 "I installed it but can't edit anything" trap,
+  // so only offer it for a frontend project and, if skipped, say how to do it.
+  const liveFramework = detectFramework(process.cwd());
+  let liveWired = false;
+  if (liveFramework !== "unknown") {
+    let wantLive = options.live ?? false;
+    if (options.live === undefined) {
+      wantLive = await confirm(
+        `  Set up Layout Live editing for this ${liveFramework} project? (build plugin + .layout/live/)`
+      );
+    }
+    if (wantLive) {
+      await installLive(process.cwd());
+      liveWired = true;
+    }
   }
 
   // --- 3. Summary ---
@@ -464,6 +473,27 @@ export async function installCommand(
     console.log();
     console.log(chalk.dim("  Figma integration skipped. To enable later:"));
     console.log(chalk.dim("    npx @layoutdesign/context install"));
+  }
+
+  // Frontend project but Live editing wasn't set up (declined, non-interactive,
+  // or not requested) → make the missing step explicit. Without this, the user
+  // sees "Done!", opens Layout Live, and nothing is editable.
+  if (
+    liveFramework !== "unknown" &&
+    !liveWired &&
+    !isPluginWired(process.cwd(), liveFramework)
+  ) {
+    console.log();
+    console.log(
+      chalk.yellow("→"),
+      "To edit your UI visually in Layout Live, set up the build plugin:"
+    );
+    console.log(chalk.cyan("    npx @layoutdesign/context install --live"));
+    console.log(
+      chalk.dim(
+        "  (The MCP install above is separate — it gives your agent context, not visual editing.)"
+      )
+    );
   }
 
   console.log();

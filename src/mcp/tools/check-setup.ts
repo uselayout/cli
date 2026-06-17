@@ -10,6 +10,10 @@ import {
   testEndpointReachable,
 } from "../../cli/setup-utils.js";
 import { connectToLive } from "./_live-socket.js";
+import {
+  classifyLiveEditing,
+  type LiveEditingClassification,
+} from "../../install/live.js";
 
 /** Structured status of the layout Live desktop app for `check-setup`. */
 export interface LiveStatus {
@@ -17,6 +21,9 @@ export interface LiveStatus {
   running: boolean;
   version?: string;
   project?: string;
+  /** Whether THIS project's dev server will emit the source tags Live needs to
+   *  make elements editable — the usual "installed but can't edit" culprit. */
+  editing?: LiveEditingClassification;
 }
 
 /** Best-effort detection of a locally installed `layout-live` binary/app. */
@@ -42,9 +49,12 @@ function isLiveInstalled(): boolean {
  */
 export async function getLiveStatus(): Promise<LiveStatus> {
   const installed = isLiveInstalled();
+  // Static, no-network: does this project emit source tags? This is the answer
+  // to "Live is open and shows my site but I can't edit anything".
+  const editing = classifyLiveEditing(process.cwd());
   const live = await connectToLive();
   if (!live) {
-    return { installed, running: false };
+    return { installed, running: false, editing };
   }
   try {
     const status = await live.send<{
@@ -57,11 +67,44 @@ export async function getLiveStatus(): Promise<LiveStatus> {
       running: status?.running !== false,
       version: status?.version,
       project: status?.project,
+      editing,
     };
   } catch {
-    return { installed, running: false };
+    return { installed, running: false, editing };
   } finally {
     live.close();
+  }
+}
+
+/** A user-facing line about whether elements are editable in Live, with the
+ *  fix when they're not. Omitted for non-frontend projects. */
+function renderEditing(editing?: LiveEditingClassification): string[] {
+  if (!editing || editing.state === "n/a") return [];
+  const FIX = "npx @layoutdesign/context install --live";
+  switch (editing.state) {
+    case "ready":
+      return [
+        `- Editing: ✅ build plugin wired (${editing.framework}${
+          editing.framework === "next" && editing.swcReady
+            ? ", native SWC tagging"
+            : ""
+        }) — elements are editable\n`,
+      ];
+    case "not-wired":
+      return [
+        "- Editing: ⚠️ **build plugin not wired** — Live can show the page but NOTHING is editable (no source tags)\n",
+        `- This is separate from the MCP server. To fix: \`${FIX}\`, then restart the dev server\n`,
+      ];
+    case "dep-missing":
+      return [
+        "- Editing: ⚠️ plugin is wired but `@layoutdesign/context` isn't installed\n",
+        `- To fix: \`${FIX}\`, then restart the dev server\n`,
+      ];
+    case "turbopack":
+      return [
+        "- Editing: ⚠️ dev script uses Turbopack, which bypasses source tagging on this Next version\n",
+        `- To fix: \`${FIX}\` (drops --turbopack), or pin Next 15.5.x / 16.2.x for native tagging, then restart\n`,
+      ];
   }
 }
 
@@ -82,6 +125,9 @@ function renderLive(live: LiveStatus): string {
       "- layout Live adds visual-edit context. Tools still work without it.\n"
     );
   }
+  // Editing readiness applies whether or not the app is running — a wired build
+  // plugin is what makes elements editable once Live opens.
+  lines.push(...renderEditing(live.editing));
   lines.push("```json");
   lines.push(JSON.stringify({ live }, null, 2));
   lines.push("```\n");

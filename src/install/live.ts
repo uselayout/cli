@@ -123,6 +123,58 @@ export function isPluginWired(
   }
 }
 
+/** True if the project's `dev` script runs Next with `--turbopack`/`--turbo`.
+ *  Read-only counterpart to fixTurbopackDevScript, for diagnostics. */
+export function devScriptUsesTurbopack(projectRoot: string): boolean {
+  try {
+    const pkg = JSON.parse(
+      fs.readFileSync(path.join(projectRoot, "package.json"), "utf8")
+    ) as { scripts?: Record<string, string> };
+    const dev = pkg.scripts?.dev ?? "";
+    return /\bnext\b/.test(dev) && /(--turbopack|--turbo)\b/.test(dev);
+  } catch {
+    return false;
+  }
+}
+
+export type LiveEditingState =
+  | "n/a" // not a Vite/Next project — Live editing doesn't apply
+  | "not-wired" // build plugin not in the config
+  | "dep-missing" // wired but @layoutdesign/context isn't installed
+  | "turbopack" // Next + dev script uses Turbopack AND native SWC tagging won't run
+  | "ready"; // wired, dep present, a working tagging path
+
+export interface LiveEditingClassification {
+  state: LiveEditingState;
+  framework: Framework;
+  /** Next App Router on a shipped SWC ABI → native tagging runs (incl. Turbopack). */
+  swcReady?: boolean;
+}
+
+/**
+ * Why a project can (or can't) be edited in Layout Live — the CLI-side mirror
+ * of the app's own classifier. Pure + static (reads config + package.json only),
+ * so `doctor`, `install`, and the `check-setup` MCP tool all agree on the verdict.
+ */
+export function classifyLiveEditing(
+  projectRoot: string
+): LiveEditingClassification {
+  const framework = detectFramework(projectRoot);
+  if (framework === "unknown") return { state: "n/a", framework };
+  if (!isPluginWired(projectRoot, framework))
+    return { state: "not-wired", framework };
+  if (!hasLayoutDependency(projectRoot))
+    return { state: "dep-missing", framework };
+  if (framework === "next") {
+    const swcReady = swcTaggingReady(projectRoot);
+    if (!swcReady && devScriptUsesTurbopack(projectRoot)) {
+      return { state: "turbopack", framework, swcReady };
+    }
+    return { state: "ready", framework, swcReady };
+  }
+  return { state: "ready", framework };
+}
+
 export interface TurbopackFix {
   changed: boolean;
   /** The `dev` script name that was (or would be) changed. */
