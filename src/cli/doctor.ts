@@ -9,6 +9,7 @@ import {
   addPlaywrightMcpServer,
   testEndpointReachable,
 } from "./setup-utils.js";
+import { classifyLiveEditing } from "../install/live.js";
 
 interface CheckResult {
   label: string;
@@ -46,6 +47,10 @@ export async function doctorCommand(options?: {
     checkNodeVersion(),
     ...checkToolClis(),
   ];
+
+  // Layout Live editing readiness (only when this is a Vite/Next project).
+  const live = checkLiveEditing(process.cwd());
+  if (live) results.push(live);
 
   // MCP server checks (deep Figma diagnostics)
   const mcpResults = await checkMcpServersDeep(verbose);
@@ -161,6 +166,56 @@ function checkNodeVersion(): CheckResult {
     detail: `Node.js 18+ is required, you have ${process.versions.node}`,
     fix: "Install Node.js 18+ from https://nodejs.org",
   };
+}
+
+/**
+ * Whether the project's dev server will emit the source tags Layout Live needs
+ * to make elements editable. Returns null for non-frontend projects (the check
+ * simply doesn't apply, so it's omitted rather than shown as a failure).
+ */
+function checkLiveEditing(cwd: string): CheckResult | null {
+  const c = classifyLiveEditing(cwd);
+  const FIX = "npx @layoutdesign/context install --live";
+  const requiredBy = "editing elements in Layout Live";
+  switch (c.state) {
+    case "n/a":
+      return null;
+    case "not-wired":
+      return {
+        label: "Layout Live editing",
+        ok: false,
+        detail: `build plugin not wired into your ${c.framework}.config — no source tags, so nothing is editable in Live`,
+        fix: FIX,
+        requiredBy,
+      };
+    case "dep-missing":
+      return {
+        label: "Layout Live editing",
+        ok: false,
+        detail:
+          "build plugin is wired but @layoutdesign/context isn't installed",
+        fix: FIX,
+        requiredBy,
+      };
+    case "turbopack":
+      return {
+        label: "Layout Live editing",
+        ok: false,
+        detail:
+          "your dev script uses Turbopack, which bypasses source tagging on this Next version",
+        fix: `${FIX} (drops --turbopack), or pin Next 15.5.x / 16.2.x for native SWC tagging`,
+        requiredBy,
+      };
+    case "ready":
+      return {
+        label: "Layout Live editing",
+        ok: true,
+        detail:
+          c.framework === "next" && c.swcReady
+            ? "wired (Next App Router, native SWC tagging)"
+            : `wired (${c.framework})`,
+      };
+  }
 }
 
 function checkToolClis(): CheckResult[] {
