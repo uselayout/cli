@@ -175,4 +175,12 @@ program
     await installLive(resolve(projectPath ?? process.cwd()));
   });
 
-program.parse();
+// Always parse as node-style argv ([exec, script, ...args] → slice 2). Without
+// an explicit `from`, commander auto-detects `electron` whenever
+// `process.versions.electron` is set — which is true when Layout Live's
+// one-click setup runs this CLI through the Electron binary with
+// ELECTRON_RUN_AS_NODE=1. In that mode argv is still node-shaped, so commander's
+// electron slice (drop 1) leaves the script path as the "command" and every
+// invocation fails with `unknown command '<…/cli.js>'`. We are always launched
+// as a node script, so `from: "node"` is correct in every case.
+program.parse(process.argv, { from: "node" });
