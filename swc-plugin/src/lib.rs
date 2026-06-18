@@ -59,19 +59,40 @@ fn is_absolute(file: &str) -> bool {
 fn make_relative(root: &str, file: &str) -> String {
     let norm = |s: &str| s.replace('\\', "/");
     let file = norm(file);
-    if !is_absolute(&file) {
-        // Turbopack: already relative to the project root.
-        return file
-            .trim_start_matches("./")
-            .trim_start_matches('/')
-            .to_string();
-    }
     let root = norm(root);
     let root_parts: Vec<&str> = root
         .trim_end_matches('/')
         .split('/')
         .filter(|s| !s.is_empty())
         .collect();
+    if !is_absolute(&file) {
+        // Turbopack passes a path relative to ITS inferred workspace root, which
+        // can be an ANCESTOR of the project root: a stray package.json in a
+        // parent dir (even $HOME) makes Turbopack infer that parent as the root,
+        // so `file` arrives like "sub/dir/proj/app/page.tsx". Strip the leading
+        // segments that reconstruct project_root's tail so the result is relative
+        // to project_root, not the inferred root. When the inferred root IS the
+        // project root (the common case) nothing matches and it's returned as-is.
+        let rel: Vec<&str> = file
+            .trim_start_matches("./")
+            .trim_start_matches('/')
+            .split('/')
+            .filter(|s| !s.is_empty())
+            .collect();
+        // Largest k where rel's leading k segments equal root's trailing k
+        // segments (keep at least the final segment — the file name).
+        let max_k = root_parts.len().min(rel.len().saturating_sub(1));
+        let mut k = 0usize;
+        let mut cand = max_k;
+        while cand >= 1 {
+            if rel[..cand] == root_parts[root_parts.len() - cand..] {
+                k = cand;
+                break;
+            }
+            cand -= 1;
+        }
+        return rel[k..].join("/");
+    }
     let file_parts: Vec<&str> = file.split('/').filter(|s| !s.is_empty()).collect();
     let mut i = 0;
     while i < root_parts.len() && i < file_parts.len() && root_parts[i] == file_parts[i] {
