@@ -14,6 +14,7 @@ import {
   classifyLiveEditing,
   type LiveEditingClassification,
 } from "../../install/live.js";
+import { supportedNextVersionsHint } from "../../plugins/next/swc.js";
 
 /** Structured status of the layout Live desktop app for `check-setup`. */
 export interface LiveStatus {
@@ -103,7 +104,14 @@ function renderEditing(editing?: LiveEditingClassification): string[] {
     case "turbopack":
       return [
         "- Editing: ⚠️ dev script uses Turbopack, which bypasses source tagging on this Next version\n",
-        `- To fix: \`${FIX}\` (drops --turbopack), or pin Next 15.5.x / 16.2.x for native tagging, then restart\n`,
+        `- To fix: \`${FIX}\` (drops --turbopack), or pin Next ${supportedNextVersionsHint()} for native tagging, then restart\n`,
+      ];
+    case "unsupported":
+      return [
+        `- Editing: ⚠️ **Next${
+          editing.nextVersion ? ` ${editing.nextVersion}` : ""
+        } App Router isn't supported yet** — the build plugin is wired but there's no SWC tagging plugin for this Next version, so Live can show the page but NOTHING is editable\n`,
+        `- To fix: pin Next ${supportedNextVersionsHint()} (App Router native SWC tagging), then restart the dev server\n`,
       ];
   }
 }

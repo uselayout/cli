@@ -121,6 +121,21 @@ export function nextAbiSupported(projectRoot: string): boolean {
   return n != null && SHIPPED_SWC_CORES.includes(n);
 }
 
+/**
+ * Human hint listing the Next versions we ship native SWC tagging for, e.g.
+ * "15.5.x or 16.2.x". Derived from the shipped ABIs so diagnostics stay correct
+ * as new ABIs are added (no hard-coded version strings to drift).
+ */
+export function supportedNextVersionsHint(): string {
+  const versions = NEXT_SWC_CORE.filter((e) =>
+    SHIPPED_SWC_CORES.includes(e.swcCore)
+  ).map((e) => `${e.major}.${e.minor}.x`);
+  const last = versions.pop();
+  if (!last) return "a supported Next version";
+  if (versions.length === 0) return last;
+  return `${versions.join(", ")} or ${last}`;
+}
+
 /** A single `experimental.swcPlugins` entry: `[specifier, options]`. */
 export type SwcPluginEntry = [string, Record<string, unknown>];
 

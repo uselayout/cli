@@ -10,6 +10,7 @@ import {
   testEndpointReachable,
 } from "./setup-utils.js";
 import { classifyLiveEditing } from "../install/live.js";
+import { supportedNextVersionsHint } from "../plugins/next/swc.js";
 
 interface CheckResult {
   label: string;
@@ -203,7 +204,17 @@ function checkLiveEditing(cwd: string): CheckResult | null {
         ok: false,
         detail:
           "your dev script uses Turbopack, which bypasses source tagging on this Next version",
-        fix: `${FIX} (drops --turbopack), or pin Next 15.5.x / 16.2.x for native SWC tagging`,
+        fix: `${FIX} (drops --turbopack), or pin Next ${supportedNextVersionsHint()} for native SWC tagging`,
+        requiredBy,
+      };
+    case "unsupported":
+      return {
+        label: "Layout Live editing",
+        ok: false,
+        detail: `Next${
+          c.nextVersion ? ` ${c.nextVersion}` : ""
+        } App Router has no matching SWC tagging plugin, so no source tags are emitted and nothing is editable in Live`,
+        fix: `Pin Next ${supportedNextVersionsHint()} (App Router native SWC tagging)`,
         requiredBy,
       };
     case "ready":

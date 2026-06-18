@@ -74,10 +74,14 @@ function detectTargets(): Target[] {
     }
   }
 
-  // Cursor — .cursor/ dir or .cursorrules
+  // Cursor — project-local .cursor/ or .cursorrules, OR the user-level ~/.cursor
+  // (matches the Codex/Gemini global fallback below; Claude is detected globally
+  // too). Without the home-dir fallback, a Cursor user running install in a
+  // project that has no .cursor/ marker silently gets Claude only.
   if (
     fs.existsSync(path.join(cwd, ".cursor")) ||
-    fs.existsSync(path.join(cwd, ".cursorrules"))
+    fs.existsSync(path.join(cwd, ".cursorrules")) ||
+    fs.existsSync(path.join(os.homedir(), ".cursor"))
   ) {
     detected.push("cursor");
   }
@@ -463,6 +467,16 @@ export async function installCommand(
   // --- 3. Summary ---
   console.log();
   console.log(chalk.green("Done!"), "Your AI agent now has access to your design system.");
+  console.log();
+  console.log(
+    chalk.dim("  Layout MCP configured for:"),
+    targets.map((t) => TARGET_INFO[t].label).join(", ")
+  );
+  console.log(
+    chalk.dim(
+      "  Using a different editor? Add it: npx @layoutdesign/context install --target <cursor|claude|windsurf|vscode|codex|gemini>"
+    )
+  );
   console.log();
   console.log(chalk.yellow("→"), "Restart your AI coding tool to activate the MCP servers.");
   console.log();
