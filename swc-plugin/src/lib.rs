@@ -126,6 +126,13 @@ fn is_jsx_string(v: &JSXAttrValue) -> bool {
 fn str_attr(name: &str, value: &str) -> JSXAttrOrSpread {
     JSXAttrOrSpread::JSXAttr(JSXAttr {
         span: DUMMY_SP,
+        // The JSX attribute-name node changed across swc_core versions: the
+        // Ident/IdentName split (>= swc_core 35) wraps an `IdentName`; older
+        // swc_core (0.90 = Next 14.2) wraps a plain `Ident`. Selected by the
+        // `legacy_ident` cargo feature (on for the swc_core-90 build).
+        #[cfg(feature = "legacy_ident")]
+        name: JSXAttrName::Ident(Ident::new(name.into(), DUMMY_SP)),
+        #[cfg(not(feature = "legacy_ident"))]
         name: JSXAttrName::Ident(IdentName::new(name.into(), DUMMY_SP)),
         value: Some(jsx_string_value(value)),
     })

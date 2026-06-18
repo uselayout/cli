@@ -44,11 +44,18 @@ mismatch is a **hard build failure**, not a graceful degrade. Next bumps its
 bundled swc_core almost every minor, so we ship **one wasm per supported ABI**
 and auto-pick by the installed Next version.
 
-- **Shipped wasms** (`swc-plugin/build.sh` builds both from one source):
+- **Shipped wasms** (`swc-plugin/build.sh` builds all from one source):
+  - `assets/layout-swc-plugin-90.wasm` → **Next 14.2.x** (swc_core 0.90.31)
   - `assets/layout-swc-plugin-35.wasm` → **Next 15.5.x** (swc_core 35)
   - `assets/layout-swc-plugin-57.wasm` → **Next 16.2.x** (swc_core 57)
+- The `-90` ABI key is the old `0.90.x` scheme — it is OLDER than 35/57, not
+  newer, despite the larger number. `SHIPPED_SWC_CORES` keys are identifiers,
+  not a newness rank; use `newestShippedSwcCore()` for "latest", never `Math.max`.
 - Parity tests run against `@swc/core` 1.15.0 (the swc_core-57 ABI).
 - **Validated end-to-end, no env var (default-on):**
+  - Next **14.2.35**: `next build` on an App Router page tags the prerendered
+    HTML (`data-layout-source-file` + component name) and the build passes. The
+    90 build needs `legacy_jsx_attr` + `legacy_ident` + a pinned older serde.
   - Next **15.5.19**: tags serve under `next dev` (webpack) AND `--turbopack`;
     `next build` passes.
   - Next **16.2.7**: tags serve under default Turbopack dev AND `--webpack`;

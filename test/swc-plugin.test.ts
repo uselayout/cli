@@ -47,8 +47,8 @@ function withEnv(value: string | undefined, fn: () => void): void {
   }
 }
 
-test("ships a wasm for every supported swc_core ABI (35 + 57)", () => {
-  assert.deepEqual([...SHIPPED_SWC_CORES], [35, 57]);
+test("ships a wasm for every supported swc_core ABI (90 + 35 + 57)", () => {
+  assert.deepEqual([...SHIPPED_SWC_CORES], [90, 35, 57]);
   for (const swc of SHIPPED_SWC_CORES) {
     const p = resolveSwcPluginPath(swc);
     assert.ok(p, `wasm for swc_core ${swc} resolved`);

@@ -13,6 +13,9 @@ crate-type = ["cdylib"]
 # (Next 15.5). Off by default → Str(Str) for swc_core >= 45 (Next 16.x). The
 # build script (build.sh) pairs this with the matching swc_core version pin.
 legacy_jsx_attr = []
+# Selects the pre-Ident/IdentName-split JSX attribute-name node used by
+# swc_core 0.90 (Next 14.2). Off by default → IdentName for swc_core >= 35.
+legacy_ident = []
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
