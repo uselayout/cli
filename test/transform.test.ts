@@ -85,6 +85,16 @@ test("skips member-expression elements (Context.Provider)", () => {
   assert.match(code, /<div data-layout-source-file/);
 });
 
+test("tags a member-expression element with a static className (framer-motion)", () => {
+  const { code } = run(
+    `function App(){ return <motion.h1 className="text-6xl">Hi</motion.h1>; }`
+  );
+  assert.match(code, /motion\.h1[^>]*data-layout-source-file/);
+  // …but a member-expression with no static className stays untagged.
+  const none = run(`function App(){ return <motion.h1>Hi</motion.h1>; }`).code;
+  assert.doesNotMatch(none, /motion\.h1[^>]*data-layout-source-file/);
+});
+
 test("skips elements bearing the raw-HTML escape-hatch prop", () => {
   const prop = ["dangerously", "Set", "Inner", "HTML"].join("");
   const { code } = run(

@@ -206,6 +206,10 @@ const FIXTURES: Array<{ name: string; code: string }> = [
     code: `function P({c}){ return <c.Provider value={1}><div>x</div></c.Provider>; }`,
   },
   {
+    name: "member-expression element WITH static className tagged (framer-motion)",
+    code: `function App(){ return <motion.h1 className="text-6xl">Hi</motion.h1>; }`,
+  },
+  {
     name: "raw-HTML escape-hatch element skipped",
     code: `function R(){ return <div ${["dangerously", "Set", "Inner", "HTML"].join("")}={{__html:'x'}} />; }`,
   },

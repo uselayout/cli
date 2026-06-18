@@ -173,21 +173,27 @@ export function transformWithLayoutAttrs(
       const opening = elPath.node.openingElement;
       const tagName = opening.name;
 
-      // Member expressions (Context.Provider, namespaced motion.div) and
-      // namespaced names are not plain DOM tags — skip.
-      if (!t.isJSXIdentifier(tagName)) return;
-      // Fragments and capitalised component names: the component is attributed
-      // at its own root element, not at each usage site.
-      if (tagName.name === "Fragment") return;
-      // Capitalised component usage: normally attributed at the component's
-      // own root, NOT each call site. BUT if the call site passes a static
-      // `className` (`<Pill className="p-4"/>`), that string IS editable in
-      // place — tag the usage so layout Live can resolve + edit it (the
-      // component must forward unknown props for the attrs to reach the
-      // DOM; if it doesn't, resolution falls back to fibre-only). Dynamic
-      // classNames stay untagged → surfaced as library-component.
-      if (/^[A-Z]/.test(tagName.name) && !hasLiteralClassName(opening)) {
-        return;
+      // Namespaced names (`<svg:a>`) are never DOM-forwarding wrappers — skip.
+      if (t.isJSXNamespacedName(tagName)) return;
+      if (t.isJSXMemberExpression(tagName)) {
+        // Member-expression elements: framer-motion `motion.h1` / `motion.div`
+        // etc forward unknown props (incl. data-*) to a real DOM element when
+        // they carry a literal className — the same "forwards to DOM" heuristic
+        // as a capitalised component. Tag those; skip the rest (e.g.
+        // `Context.Provider`, which renders no DOM element).
+        if (!hasLiteralClassName(opening)) return;
+      } else {
+        // JSXIdentifier. Fragments and capitalised component names are
+        // attributed at the component's own root, not each usage — EXCEPT a
+        // capitalised usage with a static `className` (`<Pill className="p-4"/>`),
+        // which IS editable in place, so tag it (the component must forward
+        // unknown props for the attrs to reach the DOM; if it doesn't,
+        // resolution falls back to fibre-only). Dynamic classNames stay
+        // untagged → surfaced as library-component.
+        if (tagName.name === "Fragment") return;
+        if (/^[A-Z]/.test(tagName.name) && !hasLiteralClassName(opening)) {
+          return;
+        }
       }
       // Idempotent.
       if (isPreAttributed(opening)) return;
