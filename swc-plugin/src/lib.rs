@@ -307,8 +307,6 @@ impl<'a> VisitMut for LayoutTagger<'a> {
     fn visit_mut_jsx_element(&mut self, n: &mut JSXElement) {
         let opening = &mut n.opening;
         let should_tag = match &opening.name {
-            // Member expressions (Context.Provider) and namespaced names aren't
-            // plain DOM tags — never tag, but still recurse into children.
             JSXElementName::Ident(ident) => {
                 let tag = ident.sym.as_ref();
                 let is_capital = tag.chars().next().is_some_and(|c| c.is_uppercase());
@@ -322,7 +320,18 @@ impl<'a> VisitMut for LayoutTagger<'a> {
                     !has_raw_html(opening)
                 }
             }
-            _ => false,
+            // Member expressions: framer-motion `motion.h1` / `motion.div` etc
+            // forward unknown props (incl. data-*) to a real DOM element when
+            // they carry a literal className — the same "forwards to DOM"
+            // heuristic as a capitalised component. Tag those so their text is
+            // selectable/editable; skip the rest (e.g. `Context.Provider`).
+            JSXElementName::JSXMemberExpr(_) => {
+                has_literal_classname(opening)
+                    && !is_pre_attributed(opening)
+                    && !has_raw_html(opening)
+            }
+            // Namespaced names (`<svg:a>`) are never DOM-forwarding wrappers.
+            JSXElementName::JSXNamespacedName(_) => false,
         };
         if should_tag {
             let span = opening.span;
