@@ -1,6 +1,6 @@
 {
   "name": "@layoutdesign/context",
-  "version": "0.14.3",
+  "version": "0.15.0",
   "description": "Design system context for AI coding agents — MCP server + CLI + live preview",
   "license": "MIT",
   "type": "module",
@@ -26,6 +26,7 @@
       "import": "./dist/src/plugins/next/index.js",
       "default": "./dist/src/plugins/next/index.js"
     },
+    "./swc-plugin-90.wasm": "./assets/layout-swc-plugin-90.wasm",
     "./swc-plugin-35.wasm": "./assets/layout-swc-plugin-35.wasm",
     "./swc-plugin-57.wasm": "./assets/layout-swc-plugin-57.wasm"
   },

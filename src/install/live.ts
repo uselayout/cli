@@ -16,7 +16,8 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { execFileSync } from "node:child_process";
 import chalk from "chalk";
-import { swcTaggingReady } from "../plugins/next/index.js";
+import { swcTaggingReady, isAppRouter } from "../plugins/next/index.js";
+import { detectNextVersion } from "../plugins/next/swc.js";
 
 const LAYOUT_PKG = "@layoutdesign/context";
 
@@ -141,7 +142,8 @@ export type LiveEditingState =
   | "n/a" // not a Vite/Next project — Live editing doesn't apply
   | "not-wired" // build plugin not in the config
   | "dep-missing" // wired but @layoutdesign/context isn't installed
-  | "turbopack" // Next + dev script uses Turbopack AND native SWC tagging won't run
+  | "turbopack" // Next Pages Router + Turbopack bypasses the Babel tagging path
+  | "unsupported" // Next App Router but no shipped SWC ABI for this version — no tagging path exists
   | "ready"; // wired, dep present, a working tagging path
 
 export interface LiveEditingClassification {
@@ -149,6 +151,8 @@ export interface LiveEditingClassification {
   framework: Framework;
   /** Next App Router on a shipped SWC ABI → native tagging runs (incl. Turbopack). */
   swcReady?: boolean;
+  /** Installed Next version, when relevant (set on "unsupported" for messaging). */
+  nextVersion?: string;
 }
 
 /**
@@ -167,7 +171,23 @@ export function classifyLiveEditing(
     return { state: "dep-missing", framework };
   if (framework === "next") {
     const swcReady = swcTaggingReady(projectRoot);
-    if (!swcReady && devScriptUsesTurbopack(projectRoot)) {
+    if (swcReady) return { state: "ready", framework, swcReady };
+    // No native SWC tagging for this Next version. On App Router the Babel/
+    // webpack tagging path is deliberately disabled (re-emitting an RSC through
+    // Babel breaks the build), so there is NO working path — the project's Next
+    // version simply isn't supported for editing yet. Dropping Turbopack would
+    // not help here, so this takes precedence over the turbopack hint.
+    if (isAppRouter(projectRoot)) {
+      return {
+        state: "unsupported",
+        framework,
+        swcReady,
+        nextVersion: detectNextVersion(projectRoot) ?? undefined,
+      };
+    }
+    // Pages Router: the Babel/webpack tagging path works, unless Turbopack
+    // bypasses the webpack() hook.
+    if (devScriptUsesTurbopack(projectRoot)) {
       return { state: "turbopack", framework, swcReady };
     }
     return { state: "ready", framework, swcReady };

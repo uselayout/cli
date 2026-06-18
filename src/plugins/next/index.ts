@@ -122,7 +122,7 @@ function writeNextDevInfo(root: string): void {
 }
 
 /** True if the project uses the Next App Router (`app/` or `src/app/`). */
-function isAppRouter(root: string): boolean {
+export function isAppRouter(root: string): boolean {
   return (
     fs.existsSync(path.join(root, "app")) ||
     fs.existsSync(path.join(root, "src", "app"))

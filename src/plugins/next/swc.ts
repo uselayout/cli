@@ -27,18 +27,23 @@ const WASM_FILE_BASENAME = "layout-swc-plugin";
 const SPECIFIER_BASENAME = "swc-plugin";
 
 /**
- * The `swc_core` ABIs we ship a prebuilt wasm for. Each corresponds to a Next
- * range (35 = Next 15.5.x, 57 = Next 16.2.x). Extend by adding a wasm via
- * swc-plugin/build.sh and listing the ABI here.
+ * The `swc_core` ABIs we ship a prebuilt wasm for. The key is the swc_core
+ * version's distinguishing number: 90 = the old 0.90.x scheme (Next 14.2.x),
+ * 35 = Next 15.5.x, 57 = Next 16.2.x. NOTE the key is NOT a sortable "newness"
+ * rank — 90 (swc_core 0.90) is OLDER than 35/57 (the post-1.0 scheme). Use
+ * `newestShippedSwcCore()` for "the latest ABI", never `Math.max`. Extend by
+ * adding a wasm via swc-plugin/build.sh and listing the ABI here.
  */
-export const SHIPPED_SWC_CORES: readonly number[] = [35, 57];
+export const SHIPPED_SWC_CORES: readonly number[] = [90, 35, 57];
 
 /**
- * Known Next `major.minor` -> bundled `swc_core` major, read from Next's own
+ * Known Next `major.minor` -> bundled `swc_core` ABI key, read from Next's own
  * `Cargo.lock` per release tag. Lets us pick the right wasm (and skip Next
  * versions we don't ship an ABI for) BEFORE Next tries to load the plugin.
+ * Ordered ascending by Next version. The 14.2 key (90) is swc_core 0.90.31.
  */
 const NEXT_SWC_CORE: Array<{ major: number; minor: number; swcCore: number }> = [
+  { major: 14, minor: 2, swcCore: 90 },
   { major: 15, minor: 3, swcCore: 21 },
   { major: 15, minor: 4, swcCore: 34 },
   { major: 15, minor: 5, swcCore: 35 },
@@ -46,6 +51,26 @@ const NEXT_SWC_CORE: Array<{ major: number; minor: number; swcCore: number }> = 
   { major: 16, minor: 1, swcCore: 49 },
   { major: 16, minor: 2, swcCore: 57 },
 ];
+
+/**
+ * The ABI for the newest Next version we ship a wasm for — what `force` mode
+ * should gamble on for an unknown Next. Computed by highest Next major.minor
+ * (NOT `Math.max(swcCore)`, which would wrongly pick the old 0.90 key 90).
+ */
+function newestShippedSwcCore(): number {
+  let best: { major: number; minor: number; swcCore: number } | null = null;
+  for (const e of NEXT_SWC_CORE) {
+    if (!SHIPPED_SWC_CORES.includes(e.swcCore)) continue;
+    if (
+      !best ||
+      e.major > best.major ||
+      (e.major === best.major && e.minor > best.minor)
+    ) {
+      best = e;
+    }
+  }
+  return best ? best.swcCore : Math.max(...SHIPPED_SWC_CORES);
+}
 
 /** Node-resolvable specifier for the wasm of a given swc_core ABI. Turbopack
  *  resolves swcPlugins via its module resolver and rejects absolute paths, so
@@ -121,6 +146,21 @@ export function nextAbiSupported(projectRoot: string): boolean {
   return n != null && SHIPPED_SWC_CORES.includes(n);
 }
 
+/**
+ * Human hint listing the Next versions we ship native SWC tagging for, e.g.
+ * "15.5.x or 16.2.x". Derived from the shipped ABIs so diagnostics stay correct
+ * as new ABIs are added (no hard-coded version strings to drift).
+ */
+export function supportedNextVersionsHint(): string {
+  const versions = NEXT_SWC_CORE.filter((e) =>
+    SHIPPED_SWC_CORES.includes(e.swcCore)
+  ).map((e) => `${e.major}.${e.minor}.x`);
+  const last = versions.pop();
+  if (!last) return "a supported Next version";
+  if (versions.length === 0) return last;
+  return `${versions.join(", ")} or ${last}`;
+}
+
 /** A single `experimental.swcPlugins` entry: `[specifier, options]`. */
 export type SwcPluginEntry = [string, Record<string, unknown>];
 
@@ -156,7 +196,7 @@ export function resolveSwcDecision(projectRoot: string): SwcDecision {
 
   if (mode === "force") {
     // No matching wasm — gamble on the newest shipped ABI (user opted in).
-    const newest = Math.max(...SHIPPED_SWC_CORES);
+    const newest = newestShippedSwcCore();
     const d = make(newest, `forced:${newest}`);
     if (d) return d;
     return { entry: null, reason: "wasm-missing" };

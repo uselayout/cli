@@ -90,7 +90,7 @@ test("turbopack when a wired Next project's dev script bypasses tagging", async 
   assert.equal(c.swcReady, false);
 });
 
-test("ready for a wired Next project on plain `next dev`", async () => {
+test("ready for a wired Next Pages Router project on plain `next dev`", async () => {
   await pkg({
     dependencies: { next: "15.3.0" },
     devDependencies: { "@layoutdesign/context": "0.14.0" },
@@ -98,4 +98,29 @@ test("ready for a wired Next project on plain `next dev`", async () => {
   });
   await config("next", WIRED_NEXT);
   assert.equal(classifyLiveEditing(tmp).state, "ready");
+});
+
+test("unsupported for a wired Next App Router project with no working tagging path", async () => {
+  await pkg({
+    dependencies: { next: "14.2.35" }, // App Router + no shipped SWC ABI → no tags
+    devDependencies: { "@layoutdesign/context": "0.14.0" },
+    scripts: { dev: "next dev" },
+  });
+  await config("next", WIRED_NEXT);
+  await fs.mkdir(path.join(tmp, "app"), { recursive: true });
+  const c = classifyLiveEditing(tmp);
+  assert.equal(c.state, "unsupported");
+  assert.equal(c.swcReady, false);
+});
+
+test("App Router unsupported takes precedence over the turbopack hint", async () => {
+  await pkg({
+    dependencies: { next: "14.2.35" },
+    devDependencies: { "@layoutdesign/context": "0.14.0" },
+    scripts: { dev: "next dev --turbopack" },
+  });
+  await config("next", WIRED_NEXT);
+  await fs.mkdir(path.join(tmp, "app"), { recursive: true });
+  // Dropping Turbopack wouldn't help App Router, so don't suggest it.
+  assert.equal(classifyLiveEditing(tmp).state, "unsupported");
 });
