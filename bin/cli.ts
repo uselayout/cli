@@ -17,6 +17,7 @@ import { importTokensJsonCommand } from "../src/cli/import-tokens-json.js";
 import { liveNotifyCommand } from "../src/cli/live-notify.js";
 import { liveOpenCommand } from "../src/cli/live-open.js";
 import { installLive } from "../src/install/live.js";
+import { notifyIfUpdate } from "../src/update-check.js";
 
 const require = createRequire(import.meta.url);
 const pkg = require("../../package.json") as { version: string };
@@ -30,6 +31,13 @@ program
   )
   .version(pkg.version);
 
+// After any short command, surface a "newer version available" notice on stderr
+// (throttled to once/day, fail-silent). `serve` blocks forever so postAction
+// never fires for it — it fires its own check at startup (below).
+program.hook("postAction", async () => {
+  await notifyIfUpdate(pkg.version);
+});
+
 program
   .command("init")
   .description("Scaffold a .layout/ directory in the current project")
@@ -42,6 +50,9 @@ program
   .command("serve")
   .description("Start the MCP server (stdio transport)")
   .action(async () => {
+    // serve runs forever, so the postAction hook never fires — kick the update
+    // check off here (fire-and-forget; prints to stderr, never stdout/MCP).
+    void notifyIfUpdate(pkg.version);
     await serveCommand();
   });
 
