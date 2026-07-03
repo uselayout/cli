@@ -140,6 +140,9 @@ so stack traces still point at your real line numbers.
 | `doctor` | Check Node.js version, AI tool CLIs, and MCP dependencies (Figma, Playwright). Use `--fix` to auto-install any missing tools. |
 | `doctor --fix` | Auto-install missing dependencies (Figma MCP, Playwright MCP). |
 | `serve-local <path>` | Serve a local directory over HTTP for use with the `url-to-figma` MCP tool. Requires Python 3. |
+| `add <name...>` | Install Layout UI components from the registry (our answer to `npx shadcn add`). Resolves registry + npm dependencies, writes the files, and merges theme variables into your global stylesheet. |
+| `add <name> --dir <path>` | Install into a specific components directory (default: `components/ui`, auto-detects `src/`). |
+| `add <name> --dry-run` | Preview files, dependencies, and CSS changes without writing anything. |
 | `list` | List all available kits (free and pro). |
 | `use <kit>` | Switch the active kit in an existing `.layout/` directory. |
 | `import <path>` | Import a design system bundle exported from Layout (`.zip`). |
@@ -161,6 +164,16 @@ npx @layoutdesign/context install --target claude
 
 # Install globally (available in all projects — each project uses its own .layout/)
 npx @layoutdesign/context install --global
+
+# Install Layout UI components (resolves deps + theme vars)
+npx @layoutdesign/context add button
+npx @layoutdesign/context add button card dialog
+
+# Preview an install without writing anything
+npx @layoutdesign/context add data-table --dry-run
+
+# Install into a custom directory
+npx @layoutdesign/context add button --dir src/ui
 
 # Switch to a different kit
 npx @layoutdesign/context use stripe-lite

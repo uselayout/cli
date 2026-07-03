@@ -6,6 +6,7 @@ import { initCommand } from "../src/cli/init.js";
 import { serveCommand } from "../src/cli/serve.js";
 import { importCommand } from "../src/cli/import-zip.js";
 import { useCommand } from "../src/cli/use.js";
+import { addCommand } from "../src/cli/add.js";
 import { listCommand } from "../src/cli/list.js";
 import { installCommand } from "../src/cli/install.js";
 import { doctorCommand } from "../src/cli/doctor.js";
@@ -69,6 +70,37 @@ program
   .action(async (kitName: string) => {
     await useCommand(kitName);
   });
+
+program
+  .command("add <name...>")
+  .description(
+    "Install Layout UI components from the registry (our answer to `npx shadcn add`). Resolves registry + npm dependencies, writes files, and merges theme variables."
+  )
+  .option(
+    "--registry <url>",
+    "Registry base URL (default: LAYOUT_REGISTRY env or the Layout UI registry)"
+  )
+  .option(
+    "--dir <path>",
+    "Target components directory (default: components/ui, auto-detects src/)"
+  )
+  .option("--css <file>", "Global stylesheet to inject theme variables into")
+  .option("--overwrite", "Overwrite files that already exist")
+  .option("--dry-run", "Print what would happen without writing anything")
+  .action(
+    async (
+      names: string[],
+      options: {
+        registry?: string;
+        dir?: string;
+        css?: string;
+        overwrite?: boolean;
+        dryRun?: boolean;
+      }
+    ) => {
+      await addCommand(names, options);
+    }
+  );
 
 program
   .command("list")
