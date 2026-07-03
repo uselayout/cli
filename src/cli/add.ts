@@ -80,6 +80,27 @@ export async function addCommand(
     );
   }
 
+  // 1b. Components consume --layout-* theme variables, which ship on the
+  // theme-layout registry item. If nothing resolved carries cssVars and the
+  // project stylesheet has no Layout tokens yet, pull the theme in too so a
+  // first `add button` produces a working result.
+  const hasCssVars = resolved.items.some((item) => item.cssVars);
+  if (!hasCssVars && !projectHasLayoutTokens(cwd, options.css)) {
+    try {
+      const theme = await resolveItems(["theme-layout"], fetchItem);
+      if (theme.items.length > 0) {
+        resolved.items.unshift(...theme.items);
+        console.log(
+          chalk.dim(
+            "No Layout theme found in this project; including theme-layout automatically."
+          )
+        );
+      }
+    } catch {
+      // Theme is a convenience: never fail the requested install over it.
+    }
+  }
+
   // 2. Work out where component files go and which import aliases to use.
   const componentsDir = resolveComponentsDir(cwd, options.dir);
   const useSrc = componentsDir.includes(`${path.sep}src${path.sep}`) ||
@@ -350,6 +371,13 @@ function injectCssVars(
 }
 
 /** Find the project global CSS: --css flag, else search common locations. */
+/** True when the project stylesheet already carries Layout theme tokens. */
+function projectHasLayoutTokens(cwd: string, cssFlag?: string): boolean {
+  const cssPath = resolveCssFile(cwd, cssFlag, false);
+  if (!cssPath || !fs.existsSync(cssPath)) return false;
+  return fs.readFileSync(cssPath, "utf8").includes("--layout-");
+}
+
 export function resolveCssFile(
   cwd: string,
   cssFlag: string | undefined,
