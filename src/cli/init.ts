@@ -77,6 +77,10 @@ export async function initCommand(options: {
   console.log(
     chalk.dim("     Auto-detects Claude Code, Cursor, Windsurf, VS Code / Copilot, Codex, and Gemini CLI.")
   );
+  console.log();
+  console.log(
+    `  ${chalk.dim("3.")} Add pre-built UI components: ${chalk.cyan("npx @layoutdesign/context add button")} ${chalk.dim("(see ui.staging.layout.design)")}`
+  );
 }
 
 async function initWithKit(kitName: string, targetDir: string): Promise<void> {

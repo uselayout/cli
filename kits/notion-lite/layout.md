@@ -126,6 +126,8 @@
 
 ## Components
 
+Matching primitives are installable via Layout UI: `npx @layoutdesign/context add <component>`.
+
 ### Button
 
 Minimal ghost-style buttons by default. The "primary" variant is used sparingly — only for true CTAs like "Create" or "Save". Text buttons are the standard. Height 28px, tight padding, barely-there hover.

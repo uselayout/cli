@@ -116,6 +116,8 @@
 
 ## Components
 
+Matching primitives are installable via Layout UI: `npx @layoutdesign/context add <component>`.
+
 ### Button
 
 Three variants: primary (solid accent fill), secondary (surface bg + border), ghost (no bg until hover). Height 32px. Font size 14px, weight 500.

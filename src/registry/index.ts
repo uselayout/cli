@@ -34,6 +34,16 @@ export interface RegistryItemCssVars {
   dark?: Record<string, string>;
 }
 
+export interface RegistryItemMeta {
+  /** One-paragraph "when to use" guidance. */
+  usage?: string;
+  /** Hard rules the component must not break. */
+  never?: string[];
+  /** Design tokens the component consumes. */
+  tokens?: string[];
+  [key: string]: unknown;
+}
+
 export interface RegistryItem {
   name: string;
   type?: string;
@@ -44,7 +54,14 @@ export interface RegistryItem {
   registryDependencies?: string[];
   files?: RegistryFile[];
   cssVars?: RegistryItemCssVars;
-  meta?: Record<string, unknown>;
+  meta?: RegistryItemMeta;
+}
+
+/** The shape served at `<registry>/registry.json` (shadcn registry schema). */
+export interface RegistryIndex {
+  name?: string;
+  homepage?: string;
+  items: RegistryItem[];
 }
 
 /** A fetcher returning parsed JSON, injected so tests can mock the network. */

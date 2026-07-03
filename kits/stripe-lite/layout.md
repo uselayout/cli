@@ -131,6 +131,8 @@
 
 ## Components
 
+Matching primitives are installable via Layout UI: `npx @layoutdesign/context add <component>`.
+
 ### Button
 
 Primary (solid purple), secondary (white + border), and ghost variants. Includes loading state with spinner. Height 36px. Uses native font stack.

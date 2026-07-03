@@ -18,6 +18,7 @@ import * as getDesignSystem from "./tools/get-design-system.js";
 import * as getTokens from "./tools/get-tokens.js";
 import * as getComponent from "./tools/get-component.js";
 import * as listComponents from "./tools/list-components.js";
+import * as listUiComponents from "./tools/list-ui-components.js";
 import * as checkCompliance from "./tools/check-compliance.js";
 import * as preview from "./tools/preview.js";
 import * as pushToFigma from "./tools/push-to-figma.js";
@@ -160,6 +161,13 @@ export async function startServer(): Promise<void> {
     listComponents.description,
     listComponents.inputSchema,
     listComponents.handler(kit, scanResult)
+  );
+
+  server.tool(
+    listUiComponents.name,
+    listUiComponents.description,
+    listUiComponents.inputSchema,
+    listUiComponents.handler()
   );
 
   server.tool(

@@ -477,6 +477,11 @@ export async function installCommand(
       "  Using a different editor? Add it: npx @layoutdesign/context install --target <cursor|claude|windsurf|vscode|codex|gemini>"
     )
   );
+  console.log(
+    chalk.dim(
+      "  Add pre-built UI components: npx @layoutdesign/context add button (see ui.staging.layout.design)"
+    )
+  );
   console.log();
   console.log(chalk.yellow("→"), "Restart your AI coding tool to activate the MCP servers.");
   console.log();

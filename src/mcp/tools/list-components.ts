@@ -6,7 +6,9 @@ export const name = "list-components";
 export const description =
   "Lists all available components: design system components from layout.md, " +
   "auto-detected React components from the codebase, and Storybook stories. " +
-  "Use this to discover existing components before building new UI.";
+  "Use this to discover existing components before building new UI. " +
+  "Pre-built Layout UI components are also available: use the list-ui-components " +
+  "tool, install with `npx @layoutdesign/context add <name>`.";
 
 export const inputSchema = {};
 
@@ -43,11 +45,15 @@ export function handler(kit: Kit | null, scanResult: ScanResult | null) {
       sections.push(`## Your Codebase (auto-detected)\n\n${lines.join("\n")}`);
     }
 
+    const uiPointer =
+      "\n\n---\nPre-built Layout UI components are also available: use the " +
+      "list-ui-components tool, install with `npx @layoutdesign/context add <name>`.";
+
     if (sections.length === 0) {
       return {
         content: [{
           type: "text" as const,
-          text: "No components found. Set up a design system with `npx @layoutdesign/context init` or create React components in this project.",
+          text: "No components found. Set up a design system with `npx @layoutdesign/context init` or create React components in this project." + uiPointer,
         }],
       };
     }
@@ -57,7 +63,7 @@ export function handler(kit: Kit | null, scanResult: ScanResult | null) {
     return {
       content: [{
         type: "text" as const,
-        text: `# Components (${total})\n\n${sections.join("\n\n")}\n\n---\n**IMPORTANT:** When building UI, reuse existing components listed above. Import from the paths shown. Do NOT generate a new Button/Card/Input if one already exists.`,
+        text: `# Components (${total})\n\n${sections.join("\n\n")}\n\n---\n**IMPORTANT:** When building UI, reuse existing components listed above. Import from the paths shown. Do NOT generate a new Button/Card/Input if one already exists.${uiPointer}`,
       }],
     };
   };

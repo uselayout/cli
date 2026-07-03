@@ -20,11 +20,38 @@ npx @layoutdesign/context init --kit linear-lite
 
 # Auto-configure your AI coding agent
 npx @layoutdesign/context install
+
+# Add a pre-built, token-contracted UI component
+npx @layoutdesign/context add button
 ```
 
 That's it. The `install` command detects Claude Code, Cursor, Windsurf, VS Code / Copilot, Codex CLI, and Gemini CLI automatically and configures the MCP server.
 
 Your agent now has access to your full design system on every request.
+
+---
+
+## Layout UI components
+
+[Layout UI](https://ui.staging.layout.design) is a reskinnable component system: 50+ token-contracted primitives (button, card, dialog, data-table…) where **every gallery kit is a theme**. The components stay the same; swap the theme and they take on a whole new brand. Your AI agent can discover them with the `list-ui-components` MCP tool and install them without writing primitives from scratch.
+
+There are two ways to install a component:
+
+```bash
+# 1. The Layout CLI — resolves registry + npm deps and merges theme variables
+npx @layoutdesign/context add button card dialog
+
+# 2. The stock shadcn CLI — point it at the Layout registry
+npx shadcn@latest add https://ui.staging.layout.design/r/button.json
+```
+
+Apply any published gallery kit as a theme by pulling its `theme.json`:
+
+```bash
+npx shadcn@latest add https://layout.design/r/stripe/theme.json
+```
+
+Browse the full catalogue at [ui.staging.layout.design](https://ui.staging.layout.design).
 
 ---
 
@@ -45,7 +72,8 @@ Eleven tools are registered with the MCP server automatically.
 | `get_design_system` | Returns the full layout.md, or a filtered section (colours, typography, spacing, components). Use this before writing any UI. |
 | `get_tokens` | Returns design tokens in CSS custom properties, W3C DTCG JSON, or Tailwind config format. |
 | `get_component` | Returns the spec and code example for a named component. |
-| `list_components` | Lists all components defined in the active kit. |
+| `list_components` | Lists all components defined in the active kit, plus auto-detected codebase and Storybook components. |
+| `list-ui-components` | Lists the pre-built, token-contracted Layout UI components installable from the registry, with an `add` command and usage/never rules for each. Use before writing UI primitives from scratch. |
 | `check_compliance` | Validates a code snippet against the design system — flags hardcoded colours, bad spacing, unknown tokens, and unrecognised components. |
 | `preview` | Pushes a component to the local live preview canvas at `localhost:4321`. Requires the preview server to be running. |
 | `push_to_figma` | Bridges to the Figma MCP server to create an editable Figma frame from component code. Requires Figma MCP to be configured separately. |
