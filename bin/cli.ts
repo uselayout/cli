@@ -15,6 +15,8 @@ import { scanCommand } from "../src/cli/scan.js";
 import { lintCommand } from "../src/cli/lint.js";
 import { diffCommand } from "../src/cli/diff.js";
 import { importTokensJsonCommand } from "../src/cli/import-tokens-json.js";
+import { exportCommand, EXPORT_FORMATS } from "../src/cli/export.js";
+import { registryGenCommand } from "../src/cli/registry-gen.js";
 import { liveNotifyCommand } from "../src/cli/live-notify.js";
 import { liveOpenCommand } from "../src/cli/live-open.js";
 import { installLive } from "../src/install/live.js";
@@ -181,6 +183,34 @@ program
   .option("--path <dir>", "Target directory containing .layout/ (default: cwd)")
   .action(async (tokensJson: string, options: { name?: string; path?: string }) => {
     await importTokensJsonCommand(tokensJson, options);
+  });
+
+program
+  .command("export")
+  .description(
+    "Export the loaded .layout/ kit to another agent-context format (design.md, AGENTS.md, CLAUDE.md, Cursor rule, or Codex skill)"
+  )
+  .requiredOption(
+    "--format <format>",
+    `Output format: ${EXPORT_FORMATS.join(" | ")}`
+  )
+  .option(
+    "--out <path>",
+    "Destination path (default: the format's conventional location at the project root)"
+  )
+  .option("--path <dir>", "Project directory containing .layout/ (default: cwd)")
+  .action(async (options: { format: string; out?: string; path?: string }) => {
+    await exportCommand(options);
+  });
+
+program
+  .command("registry-gen [kit...]")
+  .description(
+    "Generate shadcn-compatible registry item JSON for kits (default: all bundled kits) so they install via `npx shadcn add <url>`"
+  )
+  .option("--out <dir>", "Output directory (default: registry/)")
+  .action(async (kitRefs: string[], options: { out?: string }) => {
+    await registryGenCommand(kitRefs, options);
   });
 
 program

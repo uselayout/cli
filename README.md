@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
 [![Node >=18](https://img.shields.io/badge/node-%3E%3D18-blue)](https://nodejs.org)
 
-An MCP server and CLI that gives AI coding agents structured design system context — tokens, components, rules — so they produce on-brand UI instead of generic code.
+An MCP server and CLI that serves and enforces your design system in any agent: structured context (tokens, components, rules) plus compliance checks, so AI coding agents produce on-brand UI instead of generic code.
 
 ---
 
@@ -65,7 +65,7 @@ AI coding agents don't know your design system. They produce UI that looks gener
 
 ## MCP Tools
 
-Eleven tools are registered with the MCP server automatically.
+Twenty tools are registered with the MCP server automatically. The core design-system tools:
 
 | Tool | Description |
 |------|-------------|
@@ -174,6 +174,8 @@ so stack traces still point at your real line numbers.
 | `list` | List all available kits (free and pro). |
 | `use <kit>` | Switch the active kit in an existing `.layout/` directory. |
 | `import <path>` | Import a design system bundle exported from Layout (`.zip`). |
+| `export --format <format>` | Export the loaded kit to another agent-context format: `design-md`, `agents-md`, `claude-md`, `cursor`, or `codex-skill`. |
+| `registry-gen [kit...]` | Generate shadcn-compatible registry item JSON for kits (default: all bundled kits). |
 
 **Examples:**
 
@@ -212,6 +214,13 @@ npx @layoutdesign/context list
 # Import a bundle from Layout
 npx @layoutdesign/context import ./my-design-export.zip
 
+# Export the kit for agents that read other formats
+npx @layoutdesign/context export --format design-md      # DESIGN.md (Google design.md interop)
+npx @layoutdesign/context export --format agents-md      # AGENTS.md managed block
+npx @layoutdesign/context export --format claude-md      # CLAUDE.md managed block
+npx @layoutdesign/context export --format cursor         # .cursor/rules/layout.mdc
+npx @layoutdesign/context export --format codex-skill    # .codex/skills/<kit>/SKILL.md
+
 # Check setup and detect issues
 npx @layoutdesign/context doctor
 
@@ -221,6 +230,44 @@ npx @layoutdesign/context doctor --fix
 # Serve a local directory for url-to-figma (requires Python 3)
 npx @layoutdesign/context serve-local ./path/to/files
 npx @layoutdesign/context serve-local ./path/to/files --port 8080
+```
+
+---
+
+## Export to other agent formats
+
+`.layout/layout.md` stays the canonical source; `export` emits companion files
+for ecosystems that read a different shape:
+
+| Format | Output | Notes |
+|--------|--------|-------|
+| `design-md` | `DESIGN.md` | Compatible with Google's [design.md](https://github.com/google-labs-code/design.md) spec. YAML token frontmatter plus the full layout.md body. |
+| `agents-md` | `AGENTS.md` | Managed block (merge-or-create): existing content is preserved, the Layout section refreshes in place on re-runs. |
+| `claude-md` | `CLAUDE.md` | Same managed-block behaviour as `agents-md`. |
+| `cursor` | `.cursor/rules/layout.mdc` | Cursor project rule with the kit's token quick reference and rules. |
+| `codex-skill` | `.codex/skills/<kit>/SKILL.md` | Kit-specific Codex skill: purpose, invocation guidance, token quick reference, MCP pointer. |
+
+Use `--out <path>` to override the destination and `--path <dir>` to point at
+a project other than the current directory.
+
+## Install kits with the shadcn CLI
+
+Every kit can be generated as a shadcn-compatible registry item with
+`registry-gen`. The three bundled kits are pre-generated under `registry/` and
+installable straight from GitHub with the stock shadcn CLI:
+
+```bash
+npx shadcn@latest add https://raw.githubusercontent.com/uselayout/layout-context/main/registry/linear-lite/registry.json
+npx shadcn@latest add https://raw.githubusercontent.com/uselayout/layout-context/main/registry/stripe-lite/registry.json
+npx shadcn@latest add https://raw.githubusercontent.com/uselayout/layout-context/main/registry/notion-lite/registry.json
+```
+
+This merges the kit's tokens into your global stylesheet as CSS variables and
+installs the kit files into `.layout/`, so the Layout MCP server picks the
+design system up too. To generate registry JSON for your own kit:
+
+```bash
+npx @layoutdesign/context registry-gen ./path/to/kit --out registry
 ```
 
 ---
@@ -260,6 +307,13 @@ npx @layoutdesign/context install
 ```
 
 This auto-detects Claude Code, Cursor, Windsurf, VS Code / Copilot, Codex CLI, and Gemini CLI and configures the MCP server. For Claude Code it uses `claude mcp add`; for other tools it writes the appropriate config file (`.cursor/mcp.json`, `.windsurf/mcp.json`, `.vscode/mcp.json`, `~/.codex/config.json`, or `~/.gemini/settings.json`).
+
+When a `.layout/` kit is present, `install` also writes static agent context
+files so agents get design-system context even without the MCP server running:
+`AGENTS.md` is created when absent (or its managed block refreshed), and Cursor
+users get `.cursor/rules/layout.mdc` (a legacy `.cursorrules` is augmented
+instead of replaced). The same applies to `install --live`, which creates
+`CLAUDE.md` and `AGENTS.md` with the Layout Live coordination block.
 
 ### Per-Project vs Global
 
