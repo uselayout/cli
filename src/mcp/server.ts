@@ -16,6 +16,7 @@ const pkg = require("../../../package.json") as { version: string };
 // Tool modules
 import * as getDesignSystem from "./tools/get-design-system.js";
 import * as getTokens from "./tools/get-tokens.js";
+import * as listTokens from "./tools/list-tokens.js";
 import * as getComponent from "./tools/get-component.js";
 import * as listComponents from "./tools/list-components.js";
 import * as listUiComponents from "./tools/list-ui-components.js";
@@ -148,6 +149,13 @@ export async function startServer(): Promise<void> {
     getTokens.description,
     getTokens.inputSchema,
     getTokens.handler(kit)
+  );
+
+  server.tool(
+    listTokens.name,
+    listTokens.description,
+    listTokens.inputSchema,
+    listTokens.handler(kit)
   );
 
   server.tool(
