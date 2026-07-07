@@ -2,8 +2,8 @@
  * MCP tool: get-recent-visual-edits
  *
  * Returns recent visual edits (class/token/inline-style/text plus media
- * edits: attribute/element-swap/import/asset) made by the user in layout
- * Live. Reads from Live's socket when running; falls back to the on-disk
+ * edits: attribute/element-swap/import/asset, and element reorders: move)
+ * made by the user in layout Live. Reads from Live's socket when running; falls back to the on-disk
  * `.layout/live/recent-edits.json` log when Live is not running. Shapes per
  * the canonical contract in `src/live/schema.ts`.
  */

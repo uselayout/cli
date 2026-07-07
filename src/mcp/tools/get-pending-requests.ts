@@ -25,7 +25,8 @@ export const description =
   "my requests', 'the notes I left', or you need to know what targeted changes " +
   "they want before editing. Each request includes its target (file:line / " +
   "component / region) so you can make the change in the right place. Works " +
-  "even when Live is not running (reads the on-disk requests log).";
+  "even when Live is not running (reads the on-disk requests log). When you " +
+  "start or finish one, report back with the mark-request tool.";
 
 export const inputSchema = {
   limit: z
@@ -42,7 +43,10 @@ export const inputSchema = {
   includeDone: z
     .boolean()
     .default(false)
-    .describe("Include requests already marked done (default: pending only)"),
+    .describe(
+      "Include requests already marked done (default: only open requests, " +
+        "pending and in-progress; each carries its status)"
+    ),
 };
 
 type Input = { limit?: number; file?: string; includeDone?: boolean };
@@ -75,7 +79,8 @@ function applyFilters(
   const limit = input.limit ?? 50;
   let filtered = requests;
   if (!input.includeDone) {
-    filtered = filtered.filter((r) => r.status === "pending");
+    // "in-progress" is still open work, keep it visible (with its status).
+    filtered = filtered.filter((r) => r.status !== "done");
   }
   if (input.file) {
     filtered = filtered.filter((r) => targetFileOf(r) === input.file);

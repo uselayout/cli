@@ -16,6 +16,7 @@ const pkg = require("../../../package.json") as { version: string };
 // Tool modules
 import * as getDesignSystem from "./tools/get-design-system.js";
 import * as getTokens from "./tools/get-tokens.js";
+import * as listTokens from "./tools/list-tokens.js";
 import * as getComponent from "./tools/get-component.js";
 import * as listComponents from "./tools/list-components.js";
 import * as listUiComponents from "./tools/list-ui-components.js";
@@ -33,6 +34,7 @@ import * as scanProject from "./tools/scan-project.js";
 import * as getSelectedElement from "./tools/get-selected-element.js";
 import * as getRecentVisualEdits from "./tools/get-recent-visual-edits.js";
 import * as getPendingRequests from "./tools/get-pending-requests.js";
+import * as markRequest from "./tools/mark-request.js";
 import * as lockFile from "./tools/lock-file.js";
 import * as unlockFile from "./tools/unlock-file.js";
 
@@ -150,6 +152,13 @@ export async function startServer(): Promise<void> {
   );
 
   server.tool(
+    listTokens.name,
+    listTokens.description,
+    listTokens.inputSchema,
+    listTokens.handler(kit)
+  );
+
+  server.tool(
     getComponent.name,
     getComponent.description,
     getComponent.inputSchema,
@@ -261,6 +270,13 @@ export async function startServer(): Promise<void> {
     getPendingRequests.description,
     getPendingRequests.inputSchema,
     getPendingRequests.handler()
+  );
+
+  server.tool(
+    markRequest.name,
+    markRequest.description,
+    markRequest.inputSchema,
+    markRequest.handler()
   );
 
   server.tool(

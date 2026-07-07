@@ -71,10 +71,11 @@ export const RequestTargetSchema = z.discriminatedUnion("kind", [
 export type RequestTarget = z.infer<typeof RequestTargetSchema>;
 
 /**
- * A single visual edit made by the user in Live. All 8 kinds:
+ * A single visual edit made by the user in Live. All 9 kinds:
  * class/token/inline-style/text are style+content edits; attribute,
  * element-swap, import and asset are media edits (img src/alt, icon swap,
- * the import line accompanying an icon swap, or an asset import).
+ * the import line accompanying an icon swap, or an asset import); move is
+ * an element reorder (Move up / Move down, plain-HTML mode).
  */
 export const VisualEditSchema = z
   .object({
@@ -94,6 +95,7 @@ export const VisualEditSchema = z
       "element-swap",
       "import",
       "asset",
+      "move",
     ]),
     before: z.string(),
     after: z.string(),
@@ -117,14 +119,19 @@ export const LiveRequestSchema = z
     timestamp: z.string(), // ISO 8601
     message: z.string(), // the user's natural-language ask
     target: RequestTargetSchema,
-    status: z.enum(["pending", "done"]), // "done" = dismissed without deleting
+    // "in-progress" = an agent has picked it up; "done" = resolved/dismissed.
+    status: z.enum(["pending", "in-progress", "done"]),
     /** Status transitions, oldest first. Additive (Live ≥ requests v2 UI). */
     history: z
       .array(
         z
           .object({
-            status: z.enum(["pending", "done"]),
+            status: z.enum(["pending", "in-progress", "done"]),
             at: z.string(), // ISO 8601
+            /** Who made the transition. Additive (closed agent loop v1). */
+            actor: z.enum(["user", "agent"]).optional(),
+            /** Free-text from the actor (e.g. what the agent did). Additive. */
+            note: z.string().optional(),
           })
           .passthrough()
       )
