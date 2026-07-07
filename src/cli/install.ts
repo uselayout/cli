@@ -10,6 +10,12 @@ import {
 } from "./setup-utils.js";
 import { installLive, detectFramework, isPluginWired } from "../install/live.js";
 import { fetchKitFromGallery } from "./fetch-kit.js";
+import { loadKit } from "../kit/loader.js";
+import {
+  generateAgentContextBlock,
+  generateCursorRuleMdc,
+} from "../export/agent-context.js";
+import { applyManagedBlock } from "../export/managed-block.js";
 
 const MCP_CONFIG = {
   command: "npx",
@@ -432,6 +438,44 @@ export async function installCommand(
       if (addMcpServerGlobal(target)) installed++;
     } else {
       if (addMcpServerViaFile(target)) installed++;
+    }
+  }
+
+  // --- 1b. Agent context files ---
+  // MCP gives agents queryable context, but agents without the server running
+  // (or ecosystems that read static files) still need a pointer to .layout/.
+  // AGENTS.md is CREATED when absent; a Cursor project rule is created too
+  // unless the project already uses a legacy .cursorrules.
+  const kit = loadKit(process.cwd());
+  if (kit) {
+    console.log();
+    console.log(chalk.bold("  Agent context files"));
+    applyManagedBlock(
+      path.join(process.cwd(), "AGENTS.md"),
+      generateAgentContextBlock(kit),
+      { label: "AGENTS.md", createIfMissing: true }
+    );
+    if (
+      targets.includes("cursor") &&
+      !fs.existsSync(path.join(process.cwd(), ".cursorrules"))
+    ) {
+      const ruleFile = path.join(process.cwd(), ".cursor", "rules", "layout.mdc");
+      const content = generateCursorRuleMdc(kit);
+      const existing = fs.existsSync(ruleFile)
+        ? fs.readFileSync(ruleFile, "utf-8")
+        : null;
+      if (existing === content) {
+        console.log(chalk.dim("  ↳"), ".cursor/rules/layout.mdc: already current");
+      } else {
+        fs.mkdirSync(path.dirname(ruleFile), { recursive: true });
+        fs.writeFileSync(ruleFile, content);
+        console.log(
+          chalk.green("  ✓"),
+          existing === null
+            ? ".cursor/rules/layout.mdc: created"
+            : ".cursor/rules/layout.mdc: refreshed"
+        );
+      }
     }
   }
 

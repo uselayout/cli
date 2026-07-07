@@ -36,6 +36,16 @@ export function loadKit(basePath?: string): Kit | null {
     }
   }
 
+  return loadKitFromDir(dir);
+}
+
+/**
+ * Load a kit from a directory that contains the kit files directly
+ * (layout.md, kit.json, tokens.css, tokens.json). Used by loadKit for
+ * .layout/ directories and by commands that operate on bundled kit
+ * directories without staging them.
+ */
+export function loadKitFromDir(dir: string): Kit | null {
   const manifestPath = join(dir, KIT_MANIFEST_FILE);
   let layoutMdPath = join(dir, LAYOUT_MD_FILE);
 

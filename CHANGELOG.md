@@ -6,6 +6,34 @@ This project adheres to [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [0.18.0]
+
+### Added
+- **`export` command**: emit the loaded `.layout/` kit in other agent-context
+  formats. `--format design-md` writes a `DESIGN.md` compatible with Google's
+  design.md spec (a faithful port of the Layout Studio generator);
+  `agents-md` / `claude-md` merge a managed design-system block into
+  `AGENTS.md` / `CLAUDE.md` (created when absent, refreshed in place on
+  re-runs); `cursor` writes `.cursor/rules/layout.mdc`; `codex-skill` writes a
+  kit-specific `.codex/skills/<kit>/SKILL.md`.
+- **`registry-gen` command**: generate shadcn-compatible registry item JSON
+  for any kit. The three bundled kits ship pre-generated under `registry/`,
+  installable with `npx shadcn@latest add <raw GitHub URL>`; the item carries
+  the kit tokens as `cssVars` and installs the kit files into `.layout/`.
+- **Claude Code plugin manifest** (`.claude-plugin/plugin.json`): the repo now
+  packages the MCP server and the `layout-md` skill as an installable Claude
+  Code plugin (`claude plugin validate` passes).
+
+### Changed
+- `install` now CREATES static agent context files instead of only augmenting
+  them: with a `.layout/` kit present, `AGENTS.md` is created when absent and
+  Cursor users get `.cursor/rules/layout.mdc` (a legacy `.cursorrules` is
+  augmented instead). `install --live` likewise creates `AGENTS.md` alongside
+  `CLAUDE.md`, and creates `.cursor/rules/layout-live.mdc` when no
+  `.cursorrules` exists.
+
+---
+
 ## [0.10.1]
 
 ### Changed

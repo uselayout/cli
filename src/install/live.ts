@@ -18,6 +18,10 @@ import { execFileSync } from "node:child_process";
 import chalk from "chalk";
 import { swcTaggingReady, isAppRouter } from "../plugins/next/index.js";
 import { detectNextVersion } from "../plugins/next/swc.js";
+import {
+  applyManagedBlock,
+  type ManagedBlock,
+} from "../export/managed-block.js";
 
 const LAYOUT_PKG = "@layoutdesign/context";
 
@@ -53,6 +57,13 @@ If you are about to edit a file the user is also editing visually:
 
 The user holds priority on visual edits. Don't undo visual tweaks unless they explicitly ask.
 ${CLAUDE_END}`;
+
+const LIVE_BLOCK: ManagedBlock = {
+  begin: CLAUDE_BEGIN,
+  end: CLAUDE_END,
+  content: CLAUDE_BLOCK,
+  name: "layout-live",
+};
 
 const LIVE_CONFIG = {
   $schema: "https://layout.design/schema/live-config/v1.json",
@@ -498,64 +509,66 @@ export function ensureLayoutLiveDir(projectRoot: string): Changes {
 }
 
 /**
- * Apply the delimited managed block to one agent file, idempotently.
- * `createIfMissing` distinguishes CLAUDE.md (always created) from
- * AGENTS.md / .cursorrules (only augmented if the project already has them).
+ * Cursor context: augment a legacy .cursorrules when the project has one;
+ * otherwise create a modern project rule at .cursor/rules/layout-live.mdc.
+ * Both paths are idempotent.
  */
-function applyManagedBlock(
-  file: string,
-  label: string,
-  createIfMissing: boolean
-): Changes {
-  const exists = fs.existsSync(file);
-  if (!exists && !createIfMissing) return { changed: false };
-  const existing = exists ? fs.readFileSync(file, "utf8") : "";
-
-  if (existing.includes(CLAUDE_BEGIN)) {
-    const before = existing.slice(0, existing.indexOf(CLAUDE_BEGIN));
-    const afterIdx = existing.indexOf(CLAUDE_END);
-    const after =
-      afterIdx === -1 ? "" : existing.slice(afterIdx + CLAUDE_END.length);
-    const next = `${before}${CLAUDE_BLOCK}${after}`;
-    if (next === existing) {
-      console.log(chalk.dim("  ↳"), `${label}: managed block already current`);
-      return { changed: false };
-    }
-    fs.writeFileSync(file, next);
-    console.log(chalk.green("  ✓"), `${label}: refreshed layout-live block`);
-    return { changed: true };
+function applyCursorLiveRule(projectRoot: string): Changes {
+  const cursorrules = path.join(projectRoot, ".cursorrules");
+  if (fs.existsSync(cursorrules)) {
+    const result = applyManagedBlock(cursorrules, LIVE_BLOCK, {
+      label: ".cursorrules",
+      createIfMissing: false,
+    });
+    return { changed: result.changed };
   }
 
-  const sep =
-    existing.length === 0 ? "" : existing.endsWith("\n") ? "\n" : "\n\n";
-  fs.writeFileSync(file, `${existing}${sep}${CLAUDE_BLOCK}\n`);
+  const ruleFile = path.join(projectRoot, ".cursor", "rules", "layout-live.mdc");
+  const content = [
+    "---",
+    "description: Layout Live visual-edit coordination. Apply when editing UI files.",
+    "alwaysApply: true",
+    "---",
+    "",
+    CLAUDE_BLOCK,
+    "",
+  ].join("\n");
+  const existing = fs.existsSync(ruleFile)
+    ? fs.readFileSync(ruleFile, "utf8")
+    : null;
+  if (existing === content) {
+    console.log(
+      chalk.dim("  ↳"),
+      ".cursor/rules/layout-live.mdc: already current"
+    );
+    return { changed: false };
+  }
+  fs.mkdirSync(path.dirname(ruleFile), { recursive: true });
+  fs.writeFileSync(ruleFile, content);
   console.log(
     chalk.green("  ✓"),
-    existing.length === 0
-      ? `${label}: created with layout-live block`
-      : `${label}: appended layout-live block`
+    existing === null
+      ? ".cursor/rules/layout-live.mdc: created"
+      : ".cursor/rules/layout-live.mdc: refreshed"
   );
   return { changed: true };
 }
 
 function appendClaudeMdSection(projectRoot: string): Changes {
-  // CLAUDE.md is created if absent; AGENTS.md / .cursorrules are only
-  // augmented when the project already exports them.
+  // CLAUDE.md and AGENTS.md are created when absent; the Cursor rule is
+  // created at .cursor/rules/ unless a legacy .cursorrules exists, in which
+  // case that file is augmented instead.
   const claude = applyManagedBlock(
     path.join(projectRoot, "CLAUDE.md"),
-    "CLAUDE.md",
-    true
+    LIVE_BLOCK,
+    { label: "CLAUDE.md", createIfMissing: true }
   );
   const agents = applyManagedBlock(
     path.join(projectRoot, "AGENTS.md"),
-    "AGENTS.md",
-    false
+    LIVE_BLOCK,
+    { label: "AGENTS.md", createIfMissing: true }
   );
-  const cursor = applyManagedBlock(
-    path.join(projectRoot, ".cursorrules"),
-    ".cursorrules",
-    false
-  );
+  const cursor = applyCursorLiveRule(projectRoot);
   return {
     changed: claude.changed || agents.changed || cursor.changed,
   };

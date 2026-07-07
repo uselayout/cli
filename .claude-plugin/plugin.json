@@ -1,0 +1,22 @@
+{
+  "name": "layout",
+  "displayName": "Layout",
+  "version": "0.18.0",
+  "description": "Serve and enforce your design system in any agent. Bundles the Layout MCP server (design tokens, component specs, compliance checks) and the layout-md skill for writing on-brand UI code.",
+  "author": {
+    "name": "Layout",
+    "url": "https://layout.design"
+  },
+  "homepage": "https://layout.design",
+  "repository": "https://github.com/uselayout/layout-context",
+  "license": "MIT",
+  "keywords": [
+    "design-system",
+    "design-tokens",
+    "mcp",
+    "ui",
+    "figma",
+    "layout"
+  ],
+  "mcpServers": "./.claude-plugin/mcp.json"
+}
