@@ -39,7 +39,7 @@ after(async () => {
 
 // --- VisualEdit -------------------------------------------------------------
 
-test("all 8 VisualEdit kinds parse", () => {
+test("all 9 VisualEdit kinds parse", () => {
   const kinds = [
     "class",
     "token",
@@ -49,6 +49,7 @@ test("all 8 VisualEdit kinds parse", () => {
     "element-swap",
     "import",
     "asset",
+    "move",
   ];
   for (const kind of kinds) {
     const res = VisualEditSchema.safeParse({
@@ -239,6 +240,34 @@ test("get-recent-visual-edits skips invalid items, keeps valid ones", async () =
   assert.equal(out.edits.length, 1);
   assert.equal(out.edits[0].id, "ok");
   assert.equal(out.warnings, undefined, "no warnings for version 1");
+});
+
+test("get-recent-visual-edits reads move entries; unknown kinds skip, not crash", async () => {
+  const move = {
+    id: "mv",
+    timestamp: "2026-07-08T10:00:00.000Z",
+    file: "index.html",
+    line: 3,
+    col: 5,
+    property: "position",
+    kind: "move",
+    before: "index 1",
+    after: "index 0",
+    beforeValue: { move: { direction: "up" } },
+  };
+  const futureKind = { ...move, id: "future", kind: "teleport" };
+  await fs.mkdir(path.join(tmp, ".layout", "live"), { recursive: true });
+  await fs.writeFile(
+    path.join(tmp, ".layout", "live", "recent-edits.json"),
+    JSON.stringify({ version: 1, edits: [move, futureKind] }),
+    "utf8"
+  );
+
+  const out = parse(await getRecentVisualEdits.handler()({}));
+  assert.equal(out.source, "edit-log-file");
+  assert.equal(out.edits.length, 1);
+  assert.equal(out.edits[0].id, "mv");
+  assert.equal(out.edits[0].kind, "move");
 });
 
 test("get-pending-requests skips invalid items, keeps valid ones", async () => {
