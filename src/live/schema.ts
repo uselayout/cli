@@ -121,6 +121,11 @@ export const LiveRequestSchema = z
     target: RequestTargetSchema,
     // "in-progress" = an agent has picked it up; "done" = resolved/dismissed.
     status: z.enum(["pending", "in-progress", "done"]),
+    /** Path (relative to `.layout/live/`) of a PNG captured when the request
+     *  was filed, e.g. "screenshots/<id>.png". Read it via the
+     *  `get-live-screenshot` MCP tool. Additive; absent when Live ran
+     *  headless or the capture failed. */
+    screenshot: z.string().optional(),
     /** Status transitions, oldest first. Additive (Live ≥ requests v2 UI). */
     history: z
       .array(

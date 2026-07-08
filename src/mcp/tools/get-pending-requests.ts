@@ -25,8 +25,10 @@ export const description =
   "my requests', 'the notes I left', or you need to know what targeted changes " +
   "they want before editing. Each request includes its target (file:line / " +
   "component / region) so you can make the change in the right place. Works " +
-  "even when Live is not running (reads the on-disk requests log). When you " +
-  "start or finish one, report back with the mark-request tool.";
+  "even when Live is not running (reads the on-disk requests log). Requests " +
+  "with a \"screenshot\" field have a capture of the page from when they were " +
+  "filed: view it with the get-live-screenshot tool. When you start or " +
+  "finish one, report back with the mark-request tool.";
 
 export const inputSchema = {
   limit: z
@@ -60,6 +62,9 @@ interface RequestsResult {
   /** Only present when something needs the caller's attention (e.g. the
    *  on-disk log is a newer schema version than this CLI understands). */
   warnings?: string[];
+  /** Present when any returned request has a stored screenshot: tells the
+   *  agent how to view it. */
+  screenshotHint?: string;
 }
 
 const REQUESTS_LOG = path.join(".layout", "live", "requests.json");
@@ -150,6 +155,15 @@ export function handler() {
       }
     } else {
       result = await readFromLog(projectRoot, input);
+    }
+
+    // Requests filed in the Live desktop app carry a screenshot of the page
+    // as it looked at the time, so point the agent at the tool that shows it.
+    if (result.requests.some((r) => r.screenshot)) {
+      result.screenshotHint =
+        'Requests with a "screenshot" field include a capture of the page ' +
+        "from when they were filed. Call the get-live-screenshot tool with " +
+        "the request's id to view it.";
     }
 
     return {

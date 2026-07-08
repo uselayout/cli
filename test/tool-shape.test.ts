@@ -12,6 +12,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import * as getSelectedElement from "../src/mcp/tools/get-selected-element.js";
 import * as getRecentVisualEdits from "../src/mcp/tools/get-recent-visual-edits.js";
 import * as getPendingRequests from "../src/mcp/tools/get-pending-requests.js";
+import * as getLiveScreenshot from "../src/mcp/tools/get-live-screenshot.js";
 import * as markRequest from "../src/mcp/tools/mark-request.js";
 import * as lockFile from "../src/mcp/tools/lock-file.js";
 import * as unlockFile from "../src/mcp/tools/unlock-file.js";
@@ -20,6 +21,7 @@ const modules = [
   { mod: getSelectedElement, expected: "get-selected-element" },
   { mod: getRecentVisualEdits, expected: "get-recent-visual-edits" },
   { mod: getPendingRequests, expected: "get-pending-requests" },
+  { mod: getLiveScreenshot, expected: "get-live-screenshot" },
   { mod: markRequest, expected: "mark-request" },
   { mod: lockFile, expected: "lock-file" },
   { mod: unlockFile, expected: "unlock-file" },

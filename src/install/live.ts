@@ -47,8 +47,13 @@ To open it (or tell the user to), run \`npx @layoutdesign/context live\` from th
 When relevant, use these MCP tools:
 - \`get-recent-visual-edits\` — recent class/token changes
 - \`get-pending-requests\` — free-text changes the user flagged on elements/regions in Live (use when they say "apply my requests" or "do the things I flagged")
+- \`mark-request\` — report back on a request: status "in-progress" when you start a longer task, "done" (with a short note) when finished, so the user sees progress in Live
+- \`get-live-screenshot\` — screenshot for a request id (when the request mentions one), or a fresh capture of the current page while Live is running
 - \`get-selected-element\` — element currently selected in Live (use when the user says "this" or "that one")
+- \`list-tokens\` — the design system's tokens as a structured catalogue (colour/typography/spacing/radius/shadow, dark-mode values tagged)
 - \`lock-file\` / \`unlock-file\` — coordinate file access before editing
+
+After completing a pending request, always call \`mark-request\` with its id and status "done".
 
 If you are about to edit a file the user is also editing visually:
 1. Call \`lock-file\` with the file path and a short TTL (default 60s).

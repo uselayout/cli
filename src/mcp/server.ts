@@ -34,6 +34,7 @@ import * as scanProject from "./tools/scan-project.js";
 import * as getSelectedElement from "./tools/get-selected-element.js";
 import * as getRecentVisualEdits from "./tools/get-recent-visual-edits.js";
 import * as getPendingRequests from "./tools/get-pending-requests.js";
+import * as getLiveScreenshot from "./tools/get-live-screenshot.js";
 import * as markRequest from "./tools/mark-request.js";
 import * as lockFile from "./tools/lock-file.js";
 import * as unlockFile from "./tools/unlock-file.js";
@@ -270,6 +271,13 @@ export async function startServer(): Promise<void> {
     getPendingRequests.description,
     getPendingRequests.inputSchema,
     getPendingRequests.handler()
+  );
+
+  server.tool(
+    getLiveScreenshot.name,
+    getLiveScreenshot.description,
+    getLiveScreenshot.inputSchema,
+    getLiveScreenshot.handler()
   );
 
   server.tool(
