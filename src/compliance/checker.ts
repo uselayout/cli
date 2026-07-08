@@ -1,6 +1,7 @@
 import type { Kit } from "../kit/types.js";
 import { defaultRules } from "./rules.js";
 import type { ComplianceRule } from "./rules.js";
+import { suggestForIssue } from "./suggest.js";
 
 export interface ComplianceIssue {
   ruleId: string;
@@ -8,6 +9,14 @@ export interface ComplianceIssue {
   severity: "error" | "warning" | "info";
   message: string;
   line?: number;
+  /** 1-based column of the offending literal, when cheaply known. */
+  column?: number;
+  /** The offending literal itself (e.g. "#ff0000" or "13px"), for
+   *  machine-driven quick fixes. Only set by rules that match a literal. */
+  value?: string;
+  /** Nearest design-system token for `value`, when one is close enough to
+   *  be a confident replacement. `null` = looked, no confident match. */
+  suggestion?: { token: string; value: string } | null;
 }
 
 export interface ComplianceResult {
@@ -33,6 +42,15 @@ export function checkCompliance(
   for (const rule of rules) {
     const ruleIssues = rule.check(code, kit);
     issues.push(...ruleIssues);
+  }
+
+  // Attach nearest-token suggestions to issues that carry the offending
+  // literal, so consumers (Live's quick fix, agents on JSON output) can
+  // replace it with a design-system token in one step.
+  for (const issue of issues) {
+    if (issue.value !== undefined && issue.suggestion === undefined) {
+      issue.suggestion = suggestForIssue(issue, kit);
+    }
   }
 
   const errorCount = issues.filter((i) => i.severity === "error").length;

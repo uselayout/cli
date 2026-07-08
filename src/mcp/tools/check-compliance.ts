@@ -12,10 +12,14 @@ export const description =
 
 export const inputSchema = {
   code: z.string().describe("The UI code snippet to check for design system compliance"),
+  format: z
+    .enum(["text", "json"])
+    .default("text")
+    .describe("Output format: 'text' for a human-readable report (default), 'json' for structured issues with nearest-token suggestions"),
 };
 
 export function handler(kit: Kit | null) {
-  return async ({ code }: { code: string }) => {
+  return async ({ code, format }: { code: string; format?: "text" | "json" }) => {
     if (!kit) {
       return {
         content: [
@@ -28,6 +32,21 @@ export function handler(kit: Kit | null) {
     }
 
     const result: ComplianceResult = checkCompliance(code, kit);
+
+    if (format === "json") {
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify({
+              passed: result.passed,
+              summary: result.summary,
+              issues: result.issues,
+            }),
+          },
+        ],
+      };
+    }
 
     if (result.passed && result.issues.length === 0) {
       return {

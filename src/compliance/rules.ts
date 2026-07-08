@@ -13,6 +13,11 @@ function getLineNumber(code: string, index: number): number {
   return code.slice(0, index).split("\n").length;
 }
 
+/** 1-based column of `index` within its line. */
+function getColumn(code: string, index: number): number {
+  return index - code.lastIndexOf("\n", index - 1);
+}
+
 /**
  * Detects hardcoded hex colours (#xxx, #xxxxxx, #xxxxxxxx) and rgb/rgba values
  * that should use design tokens instead.
@@ -36,21 +41,25 @@ const hardcodedColours: ComplianceRule = {
         ruleId: this.id,
         ruleName: this.name,
         severity: this.severity,
-        message: `Hardcoded colour "${match[0]}" — consider using a design token instead.`,
+        message: `Hardcoded colour "${match[0]}", consider using a design token instead.`,
         line: getLineNumber(code, match.index),
+        column: getColumn(code, match.index),
+        value: match[0],
       });
     }
 
-    // Match rgb()/rgba() values
-    const rgbPattern = /rgba?\(\s*\d+/g;
+    // Match full rgb()/rgba() values (whole call, so the literal is fixable)
+    const rgbPattern = /rgba?\(\s*\d[^)]*\)/g;
 
     while ((match = rgbPattern.exec(code)) !== null) {
       issues.push({
         ruleId: this.id,
         ruleName: this.name,
         severity: this.severity,
-        message: `Hardcoded colour value "${match[0]}..." — consider using a design token instead.`,
+        message: `Hardcoded colour value "${match[0]}", consider using a design token instead.`,
         line: getLineNumber(code, match.index),
+        column: getColumn(code, match.index),
+        value: match[0],
       });
     }
 
@@ -80,8 +89,11 @@ const hardcodedSpacing: ComplianceRule = {
         ruleId: this.id,
         ruleName: this.name,
         severity: this.severity,
-        message: `Hardcoded spacing "${match[0]}" — consider using a spacing token instead.`,
+        message: `Hardcoded spacing "${match[0]}", consider using a spacing token instead.`,
         line: getLineNumber(code, match.index),
+        column: getColumn(code, match.index),
+        // The px literal alone ("13px"), not the whole declaration.
+        value: match[0].match(/\d+px/i)?.[0],
       });
     }
 
@@ -130,6 +142,8 @@ const missingTokenReference: ComplianceRule = {
           severity: this.severity,
           message: `Token "${tokenName}" is not defined in the kit's tokens. Check for typos or use a defined token.`,
           line: getLineNumber(code, usageMatch.index),
+          column: getColumn(code, usageMatch.index),
+          value: tokenName,
         });
       }
     }
@@ -169,6 +183,8 @@ const unknownComponent: ComplianceRule = {
           severity: this.severity,
           message: `Component "<${componentName}>" is not in the kit's component list. It may be missing or misspelled.`,
           line: getLineNumber(code, match.index),
+          column: getColumn(code, match.index),
+          value: componentName,
         });
       }
     }
