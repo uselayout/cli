@@ -65,7 +65,7 @@ AI coding agents don't know your design system. They produce UI that looks gener
 
 ## MCP Tools
 
-Twenty tools are registered with the MCP server automatically. The core design-system tools:
+Twenty-three tools are registered with the MCP server automatically. The core design-system tools:
 
 | Tool | Description |
 |------|-------------|
@@ -79,7 +79,8 @@ Twenty tools are registered with the MCP server automatically. The core design-s
 | `push_to_figma` | Bridges to the Figma MCP server to create an editable Figma frame from component code. Requires Figma MCP to be configured separately. |
 | `design_in_figma` | Takes a natural language prompt (e.g. "A pricing card with 3 tiers") and returns design tokens, component specs, and step-by-step instructions for calling Figma MCP's `generate_figma_design`. Enables AI agents to design in Figma before writing code. Inputs: `prompt` (required), `fileKey` (optional), `viewports` (optional: desktop/tablet/mobile). |
 | `url_to_figma` | Captures a live website URL as editable Figma frames with auto-layout. Inputs: `url`, `viewports`, `outputMode` (newFile/existingFile/clipboard), `fileKey`. Requires both Figma MCP and Playwright MCP servers. |
-| `update_tokens` | Updates token values in `tokens.css`, `tokens.json`, and `layout.md` simultaneously. Use when tweaking colours, spacing, or other tokens without re-extracting. Keeps the entire design system consistent. |
+| `update_tokens` | Updates token values in `tokens.css`, `tokens.json`, and `layout.md` simultaneously, mode-aware (light/dark/all) so dark themes are never clobbered. Use when tweaking colours, spacing, or other tokens without re-extracting. |
+| `list-tokens` | Returns the design tokens as a structured catalogue: `{cssVar, value, category, mode}` grouped into colour, typography, spacing, radius and shadow, with dark-mode values tagged. Powers Layout Live's Design tab. |
 
 ---
 
@@ -87,7 +88,7 @@ Twenty tools are registered with the MCP server automatically. The core design-s
 
 > Added in v0.7.0. Pairs with the **layout Live** desktop app.
 
-When the [layout Live](https://layout.design) desktop app is running, four
+When the [layout Live](https://layout.design) desktop app is running, seven
 extra MCP tools give your AI coding agent context on what you're doing
 visually:
 
@@ -96,6 +97,8 @@ visually:
 | `get-selected-element` | Returns the element currently selected in Live. Use when the user says "this" or "that one". Returns `{ running: false }` if Live isn't running. |
 | `get-recent-visual-edits` | Recent class/token/inline-style edits. Reads Live's socket when running; falls back to the on-disk `.layout/live/recent-edits.json` log otherwise — so it's useful even when Live is closed. |
 | `get-pending-requests` | Free-text changes the user pinned to elements/regions in Live ("make this the primary CTA"). Reads Live's socket when running; falls back to `.layout/live/requests.json` otherwise. Use when the user says "apply my requests" or "do the things I flagged". |
+| `mark-request` | Reports progress back to Live: mark a request "in-progress" when starting, "done" (with an optional note) when finished. The pin and panel entry update live, closing the loop. |
+| `get-live-screenshot` | Returns the screenshot captured with a request (`requestId`), or a fresh capture of the current page over the socket when Live is running. |
 | `lock-file` | Reserves exclusive write access to a file before editing, so Claude and Live don't clobber each other. |
 | `unlock-file` | Releases a previously-acquired lock. |
 
