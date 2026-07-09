@@ -13,6 +13,7 @@ import { doctorCommand } from "../src/cli/doctor.js";
 import { serveLocalCommand } from "../src/cli/serve-local.js";
 import { scanCommand } from "../src/cli/scan.js";
 import { lintCommand } from "../src/cli/lint.js";
+import { checkCommand, DEFAULT_CHANGED_BASE } from "../src/cli/check.js";
 import { diffCommand } from "../src/cli/diff.js";
 import { importTokensJsonCommand } from "../src/cli/import-tokens-json.js";
 import { exportCommand, EXPORT_FORMATS } from "../src/cli/export.js";
@@ -167,6 +168,48 @@ program
   .action(async (options: { json?: boolean; quiet?: boolean; path?: string }) => {
     await lintCommand(options);
   });
+
+program
+  .command("check [paths...]")
+  .description(
+    "Run design-system compliance rules over project UI source files and fail on violations (the CI gate)"
+  )
+  .option("--ci", "Emit GitHub Actions annotations (::error / ::warning) plus a summary line")
+  .option("--format <format>", "Output format: text or json", "text")
+  .option("--warnings-as-errors", "Treat warnings as errors for the exit code")
+  .option("--max-warnings <n>", "Fail when the warning count exceeds <n>")
+  .option(
+    "--exclude <glob>",
+    "Skip files matching this glob, repeatable (also honours check.exclude in .layout/kit.json)",
+    (value: string, previous: string[]) => previous.concat(value),
+    [] as string[]
+  )
+  .option("--changed", `Only check files changed vs the base ref (default: ${DEFAULT_CHANGED_BASE})`)
+  .option("--base <ref>", "Base ref for --changed", DEFAULT_CHANGED_BASE)
+  .option("--path <dir>", "Project directory containing .layout/ (default: cwd)")
+  .action(
+    async (
+      paths: string[],
+      options: {
+        ci?: boolean;
+        format?: string;
+        warningsAsErrors?: boolean;
+        maxWarnings?: string;
+        exclude?: string[];
+        changed?: boolean;
+        base?: string;
+        path?: string;
+      }
+    ) => {
+      await checkCommand(paths, {
+        ...options,
+        maxWarnings:
+          options.maxWarnings !== undefined
+            ? parseInt(options.maxWarnings, 10)
+            : undefined,
+      });
+    }
+  );
 
 program
   .command("diff <base> <head>")

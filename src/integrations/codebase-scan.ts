@@ -105,9 +105,10 @@ function isStoryFile(filePath: string): boolean {
 
 /**
  * Recursively walk a directory, yielding file paths.
- * Skips directories in the SKIP_DIRS set.
+ * Skips directories in the SKIP_DIRS set and dot-directories.
+ * Shared by the codebase scanner and the `check` CLI command.
  */
-async function* walkDir(dir: string): AsyncGenerator<string> {
+export async function* walkDir(dir: string): AsyncGenerator<string> {
   let entries;
   try {
     entries = await readdir(dir, { withFileTypes: true });
