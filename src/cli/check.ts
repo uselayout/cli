@@ -15,7 +15,7 @@
  *       setup error, not a pass.
  */
 import { resolve, relative, extname, isAbsolute, sep } from "node:path";
-import { readFileSync, existsSync, statSync } from "node:fs";
+import { readFileSync, existsSync, statSync, realpathSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { loadKit } from "../kit/loader.js";
 import type { Kit } from "../kit/types.js";
@@ -175,12 +175,26 @@ export async function collectFiles(
 
 /**
  * Files changed vs a base ref, via `git diff --name-only <base>...HEAD`.
+ * git prints paths relative to the repository toplevel, NOT the cwd, so
+ * they are resolved against `git rev-parse --show-toplevel` and filtered to
+ * files under the project root: in a monorepo the project (and its .layout/)
+ * may live in a subdirectory of the repository, and resolving against the
+ * project root would double the path and silently drop every changed file.
  * Returns absolute paths of files that still exist and have a checkable
  * extension. Returns null when git fails (not a repo, missing base ref),
  * so the caller can degrade gracefully.
  */
 export function getChangedFiles(root: string, base: string): string[] | null {
   try {
+    const toplevel = execFileSync(
+      "git",
+      ["rev-parse", "--show-toplevel"],
+      { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+    ).trim();
+    // git resolves symlinks in the toplevel (macOS /var → /private/var), so
+    // locate the project inside the repository via its real path. "" when
+    // the project root IS the toplevel (the single-repo case).
+    const prefix = relative(toplevel, realpathSync(root));
     const out = execFileSync(
       "git",
       ["diff", "--name-only", `${base}...HEAD`],
@@ -190,10 +204,14 @@ export function getChangedFiles(root: string, base: string): string[] | null {
       .split("\n")
       .map((line) => line.trim())
       .filter(Boolean)
-      .map((file) => resolve(root, file))
+      .map((file) =>
+        resolve(root, prefix.length > 0 ? relative(prefix, file) : file),
+      )
       .filter(
         (file) =>
-          CHECK_EXTENSIONS.has(extname(file).toLowerCase()) && existsSync(file),
+          file.startsWith(root + sep) &&
+          CHECK_EXTENSIONS.has(extname(file).toLowerCase()) &&
+          existsSync(file),
       );
   } catch {
     return null;

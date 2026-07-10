@@ -133,6 +133,16 @@ test("parseCssVariables reads :root and dark blocks", () => {
   ]);
 });
 
+test("parseCssVariables tags @media prefers-color-scheme dark as dark and dedupes", () => {
+  // Studio's generator always emits the dark tokens twice: [data-theme="dark"]
+  // plus an @media (prefers-color-scheme: dark) { :root { ... } } duplicate.
+  const css = `:root {\n  --a: #fff;\n}\n[data-theme="dark"] {\n  --a: #000;\n}\n@media (prefers-color-scheme: dark) {\n  :root {\n    --a: #000;\n  }\n}\n`;
+  assert.deepEqual(parseCssVariables(css), [
+    { name: "a", value: "#fff", mode: undefined },
+    { name: "a", value: "#000", mode: "dark" },
+  ]);
+});
+
 test("kitDesignTokens falls back to tokens.css heuristics", () => {
   const kit: Kit = {
     ...FIXTURE_KIT,

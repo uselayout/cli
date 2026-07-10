@@ -10,6 +10,7 @@
  */
 import type { Kit } from "../kit/types.js";
 import type { DesignMdToken, DesignMdTokens } from "./design-md.js";
+import { parseCssBlocks } from "./css-blocks.js";
 
 export interface CssVariable {
   /** Custom property name WITHOUT the leading `--`. */
@@ -20,26 +21,31 @@ export interface CssVariable {
 }
 
 /**
- * Parse custom properties out of a flat token stylesheet (:root plus optional
- * `[data-theme="dark"]` / `.dark` blocks). Deliberately simple: kit token
- * files are generated, flat CSS without nested at-rules.
+ * Parse custom properties out of a token stylesheet: `:root` plus the
+ * dark-mode blocks Studio's generator emits (`[data-theme="dark"]`, `.dark`,
+ * and the `@media (prefers-color-scheme: dark) { :root { ... } }` duplicate).
+ * Declarations under a dark block, including via an @media ancestor, carry
+ * mode "dark". Identical (name, value, mode) duplicates collapse to one
+ * entry, so the [data-theme] block and its @media duplicate yield a single
+ * dark entry.
  */
 export function parseCssVariables(css: string): CssVariable[] {
   const vars: CssVariable[] = [];
-  const blockRe = /([^{}]+)\{([^{}]*)\}/g;
-  let block: RegExpExecArray | null;
-  while ((block = blockRe.exec(css)) !== null) {
-    const selector = (block[1] ?? "").trim();
-    const body = block[2] ?? "";
-    const mode =
-      /data-theme=['"]?dark['"]?|\.dark\b/.test(selector) ? "dark" : undefined;
+  const seen = new Set<string>();
+  for (const block of parseCssBlocks(css)) {
+    const body = css.slice(block.bodyStart, block.bodyEnd);
+    const mode = block.dark ? "dark" : undefined;
     const declRe = /--([\w-]+)\s*:\s*([^;]+);/g;
     let decl: RegExpExecArray | null;
     while ((decl = declRe.exec(body)) !== null) {
       const name = decl[1];
       const value = decl[2];
       if (!name || !value) continue;
-      vars.push({ name, value: value.trim(), mode });
+      const trimmed = value.trim();
+      const key = `${mode ?? "light"} ${name} ${trimmed}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      vars.push({ name, value: trimmed, mode });
     }
   }
   return vars;

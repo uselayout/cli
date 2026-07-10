@@ -120,6 +120,48 @@ test('tags values under a [data-theme="dark"] block as mode "dark"', async () =>
   assert.equal(primary.find((t) => t.mode === "dark")?.value, "#818cf8");
 });
 
+test("@media prefers-color-scheme dark duplicates are dark, deduped with [data-theme]", async () => {
+  // Exact Studio-generated shape: every dark token is emitted twice, under
+  // [data-theme="dark"] AND inside @media (prefers-color-scheme: dark).
+  // Both must classify as dark and collapse to ONE dark entry, otherwise
+  // Live's Design tab shows a bogus light row carrying the dark value.
+  const kit = makeKit({
+    tokensCss: `:root {
+  --color-primary: #6366f1;
+  --color-bg: #ffffff;
+}
+
+[data-theme="dark"] {
+  --color-primary: #818cf8;
+  --color-bg: #0c0c0e;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-primary: #818cf8;
+    --color-bg: #0c0c0e;
+  }
+}
+`,
+  });
+  const tokens = await runJson(kit);
+  for (const cssVar of ["--color-primary", "--color-bg"]) {
+    const entries = tokens.filter((t) => t.cssVar === cssVar);
+    assert.equal(entries.length, 2, `${cssVar}: one light + one dark entry`);
+    assert.deepEqual(entries.map((t) => t.mode).sort(), ["dark", "light"]);
+  }
+  assert.equal(
+    tokens.find((t) => t.cssVar === "--color-primary" && t.mode === "light")
+      ?.value,
+    "#6366f1"
+  );
+  assert.equal(
+    tokens.find((t) => t.cssVar === "--color-primary" && t.mode === "dark")
+      ?.value,
+    "#818cf8"
+  );
+});
+
 test("DTCG $type from tokens.json overrides the heuristics", async () => {
   const kit = makeKit({
     // Heuristics alone would file --ramp-1 under "other" (no space/gap name)

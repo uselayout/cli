@@ -22,10 +22,21 @@ interface Rgb {
   r: number;
   g: number;
   b: number;
+  /** Alpha channel, 0..1. 1 for literals with no alpha component. */
+  a: number;
+}
+
+/** "0.45" → 0.45, "45%" → 0.45, absent → 1 (opaque), clamped to 0..1. */
+function parseAlpha(raw: string | undefined): number {
+  if (raw === undefined) return 1;
+  const pct = raw.endsWith("%");
+  const n = Number(pct ? raw.slice(0, -1) : raw);
+  if (!Number.isFinite(n)) return 1;
+  return Math.min(1, Math.max(0, pct ? n / 100 : n));
 }
 
 /**
- * Parse a CSS colour literal to RGB. Supports #rgb/#rgba/#rrggbb/#rrggbbaa,
+ * Parse a CSS colour literal to RGBA. Supports #rgb/#rgba/#rrggbb/#rrggbbaa,
  * rgb()/rgba() and hsl()/hsla(). Returns null for anything else (var() refs,
  * named colours, oklch, gradients), those are never suggestion candidates.
  */
@@ -39,6 +50,7 @@ export function parseColour(input: string): Rgb | null {
         r: parseInt(hex[0]! + hex[0]!, 16),
         g: parseInt(hex[1]! + hex[1]!, 16),
         b: parseInt(hex[2]! + hex[2]!, 16),
+        a: hex.length === 4 ? parseInt(hex[3]! + hex[3]!, 16) / 255 : 1,
       };
     }
     if (hex.length === 6 || hex.length === 8) {
@@ -46,33 +58,39 @@ export function parseColour(input: string): Rgb | null {
         r: parseInt(hex.slice(0, 2), 16),
         g: parseInt(hex.slice(2, 4), 16),
         b: parseInt(hex.slice(4, 6), 16),
+        a: hex.length === 8 ? parseInt(hex.slice(6, 8), 16) / 255 : 1,
       };
     }
     return null;
   }
 
   const rgb =
-    /^rgba?\(\s*(\d{1,3})\s*[,\s]\s*(\d{1,3})\s*[,\s]\s*(\d{1,3})/.exec(v);
+    /^rgba?\(\s*(\d{1,3})\s*[,\s]\s*(\d{1,3})\s*[,\s]\s*(\d{1,3})(?:\s*[,/]\s*([\d.]+%?))?/.exec(
+      v,
+    );
   if (rgb) {
     const r = Number(rgb[1]);
     const g = Number(rgb[2]);
     const b = Number(rgb[3]);
     if (r > 255 || g > 255 || b > 255) return null;
-    return { r, g, b };
+    return { r, g, b, a: parseAlpha(rgb[4]) };
   }
 
   const hsl =
-    /^hsla?\(\s*([\d.]+)(?:deg)?\s*[,\s]\s*([\d.]+)%\s*[,\s]\s*([\d.]+)%/.exec(
+    /^hsla?\(\s*([\d.]+)(?:deg)?\s*[,\s]\s*([\d.]+)%\s*[,\s]\s*([\d.]+)%(?:\s*[,/]\s*([\d.]+%?))?/.exec(
       v,
     );
   if (hsl) {
-    return hslToRgb(Number(hsl[1]), Number(hsl[2]) / 100, Number(hsl[3]) / 100);
+    return {
+      ...hslToRgb(Number(hsl[1]), Number(hsl[2]) / 100, Number(hsl[3]) / 100),
+      a: parseAlpha(hsl[4]),
+    };
   }
 
   return null;
 }
 
-function hslToRgb(h: number, s: number, l: number): Rgb {
+function hslToRgb(h: number, s: number, l: number): Omit<Rgb, "a"> {
   const hue = ((h % 360) + 360) % 360;
   const c = (1 - Math.abs(2 * l - 1)) * s;
   const x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
@@ -98,9 +116,10 @@ function hslToRgb(h: number, s: number, l: number): Rgb {
 
 /**
  * Redmean colour distance: a cheap perceptual weighting of RGB distance.
- * Range is 0 (identical) to ~765 (black vs white).
+ * Range is 0 (identical) to ~765 (black vs white). Alpha is deliberately
+ * not part of the metric: candidates are alpha-gated before scoring.
  */
-export function colourDistance(a: Rgb, b: Rgb): number {
+export function colourDistance(a: Omit<Rgb, "a">, b: Omit<Rgb, "a">): number {
   const rMean = (a.r + b.r) / 2;
   const dr = a.r - b.r;
   const dg = a.g - b.g;
@@ -165,6 +184,11 @@ export function nearestColourToken(
   for (const t of tokens) {
     const rgb = parseColour(t.value);
     if (!rgb) continue;
+    // Alpha must agree: a translucent literal (a scrim, an overlay) matched
+    // against a solid token would turn opaque when "fixed", visibly changing
+    // the UI. Only tokens with the same translucency stay candidates; when
+    // none exist the literal is treated as novel (no suggestion).
+    if (Math.abs(target.a - rgb.a) > 0.02) continue;
     const distance = colourDistance(target, rgb);
     if (!best || distance < best.distance) {
       best = { token: { token: `--${t.name}`, value: t.value }, distance };

@@ -172,6 +172,41 @@ test("tokens.json: dark update prefers the $extensions.mode dark entry", async (
   assert.equal(json.color.primary.$value, "#6366f1");
 });
 
+test("tokens.json: a dark update never falls back to an unrelated light entry", async () => {
+  // The dark CSS value (#ffffff) collides with a LIGHT json entry's $value.
+  // With a mode dimension present but no matching dark entry, the update
+  // must report the json miss, not rewrite the unrelated light entry.
+  await fs.writeFile(
+    path.join(dir, ".layout", "tokens.css"),
+    ':root {\n  --color-text: #111111;\n  --color-background: #ffffff;\n}\n\n[data-theme="dark"] {\n  --color-text: #ffffff;\n}\n'
+  );
+  await fs.writeFile(
+    path.join(dir, ".layout", "tokens.json"),
+    JSON.stringify({
+      color: {
+        background: { $type: "color", $value: "#ffffff" },
+        "accent-dark": {
+          $type: "color",
+          $value: "#818cf8",
+          $extensions: { mode: "dark" },
+        },
+      },
+    })
+  );
+  const text = await run([{ token: "--color-text", value: "#f0f0f0", mode: "dark" }]);
+  // The CSS dark block is updated...
+  const css = await readCss();
+  assert.match(css, /\[data-theme="dark"\] \{\n  --color-text: #f0f0f0;/);
+  assert.match(css, /--color-background: #ffffff;/);
+  // ...but the light background entry sharing the old value is untouched,
+  // and the miss is reported instead of a phantom tick.
+  const json = JSON.parse(
+    await fs.readFile(path.join(dir, ".layout", "tokens.json"), "utf-8")
+  ) as { color: { background: { $value: string } } };
+  assert.equal(json.color.background.$value, "#ffffff");
+  assert.match(text, /⚠ tokens\.json \(no matching \$value found\)/);
+});
+
 test("tokens.json without a mode dimension still matches by old value", async () => {
   await fs.writeFile(
     path.join(dir, ".layout", "tokens.json"),
@@ -207,4 +242,34 @@ test("parseCssBlocks classifies nested @media dark and base blocks", () => {
 test("replaceTokenInCss reports unchanged when the value already matches", () => {
   const res = replaceTokenInCss(CSS, "--color-primary", "#6366F1", "light");
   assert.deepEqual(res, { ok: false, reason: "unchanged", oldValue: "#6366f1" });
+});
+
+test("replaceTokenInCss is only unchanged when EVERY targeted occurrence matches", () => {
+  // Mode "all" with the light value: the base :root occurrence already
+  // matches, but both dark blocks differ and must still be unified.
+  const res = replaceTokenInCss(CSS, "--color-primary", "#6366f1", "all");
+  assert.equal(res.ok, true);
+  if (res.ok) {
+    assert.equal(res.replaced, 2);
+    // oldValue is the first value that actually changed, so the
+    // tokens.json / layout.md sync chases the dark value.
+    assert.equal(res.oldValue, "#818cf8");
+    assert.equal(res.css.match(/--color-primary: #6366f1;/g)?.length, 3);
+  }
+  // When every occurrence already matches, "all" is still unchanged.
+  const noop = replaceTokenInCss(
+    ":root {\n  --x: 1px;\n}\n.dark {\n  --x: 1px;\n}\n",
+    "--x",
+    "1px",
+    "all"
+  );
+  assert.deepEqual(noop, { ok: false, reason: "unchanged", oldValue: "1px" });
+});
+
+test("mode all unifies the dark blocks even when the base value already matches", async () => {
+  const text = await run([{ token: "--color-primary", value: "#6366f1", mode: "all" }]);
+  assert.match(text, /--color-primary: #818cf8 → #6366f1/);
+  const css = await readCss();
+  assert.equal(css.match(/--color-primary: #6366f1;/g)?.length, 3);
+  assert.equal(css.includes("#818cf8"), false);
 });
