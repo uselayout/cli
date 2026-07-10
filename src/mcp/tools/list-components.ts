@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type { Kit } from "../../kit/types.js";
 import type { ScanResult } from "../../integrations/codebase-scan.js";
 
@@ -10,10 +11,61 @@ export const description =
   "Pre-built Layout UI components are also available: use the list-ui-components " +
   "tool, install with `npx @layoutdesign/context add <name>`.";
 
-export const inputSchema = {};
+export const inputSchema = {
+  format: z
+    .enum(["text", "json"])
+    .default("text")
+    .describe(
+      "Output format: 'text' for a markdown inventory (default), 'json' for a structured component list"
+    ),
+};
+
+/** One entry in the `format: "json"` output. */
+export interface ComponentListEntry {
+  name: string;
+  description?: string;
+  source: "design-system" | "codebase";
+  /** Whether get-component can return a code example for it. */
+  hasCode: boolean;
+  tokens?: string[];
+  filePath?: string;
+  props?: string[];
+  stories?: string[];
+}
 
 export function handler(kit: Kit | null, scanResult: ScanResult | null) {
-  return async () => {
+  return async ({ format }: { format?: "text" | "json" } = {}) => {
+    if (format === "json") {
+      const components: ComponentListEntry[] = [
+        ...(kit?.components ?? []).map((c): ComponentListEntry => ({
+          name: c.name,
+          ...(c.description && { description: c.description }),
+          source: "design-system",
+          hasCode: Boolean(c.codeExample),
+          ...(c.tokens.length > 0 && { tokens: c.tokens }),
+        })),
+        ...(scanResult?.components ?? []).slice(0, 100).map(
+          (c): ComponentListEntry => ({
+            name: c.name,
+            source: "codebase",
+            hasCode: false,
+            filePath: c.filePath,
+            ...(c.props.length > 0 && {
+              props: c.props.map((p) => p.name),
+            }),
+            ...(c.storybook && {
+              stories: c.storybook.stories.map((s) => s.name),
+            }),
+          })
+        ),
+      ];
+      return {
+        content: [
+          { type: "text" as const, text: JSON.stringify({ components }) },
+        ],
+      };
+    }
+
     const sections: string[] = [];
 
     // 1. Design system components from layout.md
