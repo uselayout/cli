@@ -9,6 +9,11 @@ export interface KitManifest {
   componentCount: number;
   aesthetic: string;
   layoutUrl?: string;
+  /** Optional settings for the `check` CLI command (the CI compliance gate). */
+  check?: {
+    /** Glob patterns (relative to the project root) to skip when scanning. */
+    exclude?: string[];
+  };
 }
 
 export interface KitSection {

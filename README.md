@@ -179,6 +179,9 @@ so stack traces still point at your real line numbers.
 | `import <path>` | Import a design system bundle exported from Layout (`.zip`). |
 | `export --format <format>` | Export the loaded kit to another agent-context format: `design-md`, `agents-md`, `claude-md`, `cursor`, or `codex-skill`. |
 | `registry-gen [kit...]` | Generate shadcn-compatible registry item JSON for kits (default: all bundled kits). |
+| `check [paths...]` | Run the compliance rules over project UI source files (`.tsx`, `.jsx`, `.html`, `.css`, `.vue`, `.svelte`) and fail on violations. Built for CI: exit 1 on findings, exit 2 when no kit is found. |
+| `check --ci` | Emit GitHub Actions annotations so findings appear inline on the PR diff, plus a summary line. |
+| `check --changed` | Only check files changed vs a base ref (default `origin/main`). Ideal for PR gates. |
 
 **Examples:**
 
@@ -233,6 +236,9 @@ npx @layoutdesign/context doctor --fix
 # Serve a local directory for url-to-figma (requires Python 3)
 npx @layoutdesign/context serve-local ./path/to/files
 npx @layoutdesign/context serve-local ./path/to/files --port 8080
+
+# Gate a PR on design-system compliance (see "CI Gate" below)
+npx @layoutdesign/context check --ci --warnings-as-errors --changed
 ```
 
 ---
@@ -629,6 +635,44 @@ The `check_compliance` tool validates a code snippet against your active kit and
 3. [write component code]
 4. check_compliance(code)     — verify before finishing
 5. preview(code)              — visual check
+```
+
+### CI Gate
+
+The same rules run in CI via the `check` command, so compliance is enforced even when no desktop app or agent is involved. It scans your UI source files, prints findings with nearest-token suggestions, and fails the build on violations.
+
+```bash
+# Locally: scan the whole project
+npx @layoutdesign/context check
+
+# In a PR: only changed files, annotated inline on the diff
+npx @layoutdesign/context check --ci --warnings-as-errors --changed
+```
+
+GitHub Actions:
+
+```yaml
+name: design-compliance
+on: pull_request
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # needed for --changed to diff against origin/main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npx @layoutdesign/context check --ci --warnings-as-errors --changed
+```
+
+Exit codes: `0` pass, `1` violations found, `2` setup error (for example no `.layout/` directory, which is a failure, not a pass). Use `--format json` for machine-readable output, `--max-warnings <n>` for a warning budget, and `--exclude <glob>` (repeatable) or a `check.exclude` array in `.layout/kit.json` to skip files:
+
+```json
+{
+  "check": { "exclude": ["src/vendor/**", "*.stories.tsx"] }
+}
 ```
 
 ---
