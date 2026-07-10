@@ -7,6 +7,16 @@
  * the request's panel row and canvas pin, so asked-for work stops going
  * stale. Updates via Live's socket when running; falls back to editing the
  * on-disk `.layout/live/requests.json` when not.
+ *
+ * Compatibility note (status enum widening): old Live app versions validate
+ * requests.json per item (safeParse) and skip rows whose status value they
+ * do not recognise, so a request this tool marks "in-progress" is hidden in
+ * those UIs until the app updates. The row is never lost: it stays in the
+ * log, the new CLI still returns it from get-pending-requests, and it
+ * reappears once marked "done" or the app understands the value. This is
+ * inherent to widening an enum additively and accepted; when extending the
+ * status set again, ship the Live app (reader) update before the CLI
+ * (writer) starts emitting the new value.
  */
 import { z } from "zod";
 import { promises as fs } from "node:fs";

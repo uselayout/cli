@@ -46,17 +46,36 @@ const TOKENS_CSS = `:root {
 }
 [data-theme="dark"] { --color-primary: #818cf8; }`;
 
-test("parseColour handles hex (3/6/8), rgb() and hsl()", () => {
-  assert.deepEqual(parseColour("#fff"), { r: 255, g: 255, b: 255 });
-  assert.deepEqual(parseColour("#6366F1"), { r: 99, g: 102, b: 241 });
-  assert.deepEqual(parseColour("#6366f1cc"), { r: 99, g: 102, b: 241 });
-  assert.deepEqual(parseColour("rgb(220, 38, 38)"), { r: 220, g: 38, b: 38 });
+test("parseColour handles hex (3/6/8), rgb() and hsl(), keeping alpha", () => {
+  assert.deepEqual(parseColour("#fff"), { r: 255, g: 255, b: 255, a: 1 });
+  assert.deepEqual(parseColour("#6366F1"), { r: 99, g: 102, b: 241, a: 1 });
+  assert.deepEqual(parseColour("#6366f1cc"), { r: 99, g: 102, b: 241, a: 0.8 });
+  assert.deepEqual(parseColour("rgb(220, 38, 38)"), {
+    r: 220,
+    g: 38,
+    b: 38,
+    a: 1,
+  });
   assert.deepEqual(parseColour("rgba(220 38 38 / 0.5)"), {
     r: 220,
     g: 38,
     b: 38,
+    a: 0.5,
   });
-  assert.deepEqual(parseColour("hsl(0, 100%, 50%)"), { r: 255, g: 0, b: 0 });
+  assert.deepEqual(parseColour("rgba(0, 0, 0, 0.45)"), {
+    r: 0,
+    g: 0,
+    b: 0,
+    a: 0.45,
+  });
+  assert.deepEqual(parseColour("rgb(0 0 0 / 45%)"), { r: 0, g: 0, b: 0, a: 0.45 });
+  assert.deepEqual(parseColour("hsl(0, 100%, 50%)"), {
+    r: 255,
+    g: 0,
+    b: 0,
+    a: 1,
+  });
+  assert.equal(parseColour("hsla(0, 100%, 50%, 0.3)")?.a, 0.3);
   assert.equal(parseColour("var(--color-primary)"), null);
   assert.equal(parseColour("rebeccapurple"), null);
   assert.equal(parseColour("rgb(300, 0, 0)"), null);
@@ -98,6 +117,57 @@ test("nearestColourToken returns null for a genuinely novel colour", () => {
   assert.equal(nearestColourToken("var(--x)", tokens), null);
   // No tokens, no suggestion.
   assert.equal(nearestColourToken("#6366f1", []), null);
+});
+
+test("translucent literals never suggest solid tokens (alpha-aware matching)", () => {
+  const ink = [{ name: "color-ink", value: "#000000" }];
+  // A 45% scrim is not the ink token, even though the RGB channels match:
+  // applying the suggestion would turn the overlay opaque.
+  assert.equal(nearestColourToken("rgba(0, 0, 0, 0.45)", ink), null);
+  assert.equal(nearestColourToken("#00000073", ink), null);
+  // A token with the same translucency is still a confident match.
+  const scrim = [{ name: "color-scrim", value: "rgb(0 0 0 / 0.45)" }];
+  assert.deepEqual(nearestColourToken("rgba(0, 0, 0, 0.45)", scrim), {
+    token: "--color-scrim",
+    value: "rgb(0 0 0 / 0.45)",
+  });
+  // #00000073 is 45.1% alpha: close enough to a 0.45 token to match.
+  assert.deepEqual(nearestColourToken("#00000073", scrim), {
+    token: "--color-scrim",
+    value: "rgb(0 0 0 / 0.45)",
+  });
+  // And an opaque literal never picks up a translucent token.
+  assert.equal(nearestColourToken("#000000", scrim), null);
+});
+
+test("dark-mode values (incl. the @media duplicate) stay out of the suggestion pool", () => {
+  // Studio-generated shape: every dark token is emitted twice, under
+  // [data-theme="dark"] AND inside @media (prefers-color-scheme: dark).
+  const kit = makeKit(`:root {
+  --color-surface: #ffffff;
+}
+
+[data-theme="dark"] {
+  --color-surface: #111114;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-surface: #111114;
+  }
+}
+`);
+  // #16161a is near the DARK surface value only. Suggesting --color-surface
+  // would render #ffffff in light mode, flipping near-black to white.
+  assert.equal(
+    suggestForIssue({ ruleId: "hardcoded-colours", value: "#16161a" }, kit),
+    null
+  );
+  // The base (light) value still suggests as before.
+  assert.deepEqual(
+    suggestForIssue({ ruleId: "hardcoded-colours", value: "#fdfdfd" }, kit),
+    { token: "--color-surface", value: "#ffffff" }
+  );
 });
 
 test("nearestSpacingToken matches within 25% and rejects beyond it", () => {

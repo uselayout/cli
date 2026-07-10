@@ -2,6 +2,7 @@ import { z } from "zod";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { LAYOUT_DIR, TOKENS_CSS_FILE, TOKENS_JSON_FILE, LAYOUT_MD_FILE } from "../../kit/types.js";
+import { parseCssBlocks } from "../../export/css-blocks.js";
 
 export const name = "update-tokens";
 
@@ -41,56 +42,10 @@ interface TokenResult {
   mdCount: number;
 }
 
-/** Selectors (or @media conditions) that mark a block as dark-mode. Mirrors
- *  the shapes Studio's tokens.css generator emits (kit-tokens.ts parses the
- *  same [data-theme="dark"] / .dark forms). */
-const DARK_BLOCK = /data-theme\s*=\s*['"]?dark['"]?|\.dark(?![\w-])|prefers-color-scheme\s*:\s*dark/i;
-
-interface CssBlock {
-  /** Index range of the block BODY (between its braces). Innermost blocks
-   *  only: an @media wrapper contributes its condition to the darkness of
-   *  the blocks nested inside it, never a body of its own. */
-  bodyStart: number;
-  bodyEnd: number;
-  dark: boolean;
-}
-
-/**
- * Split a token stylesheet into its innermost declaration blocks via brace
- * matching, classifying each as base (light) or dark-mode. Handles the
- * generated shapes: flat `:root { }`, `[data-theme="dark"] { }`, `.dark { }`
- * and `@media (prefers-color-scheme: dark) { :root { } }` nesting.
- * Deliberately simple: kit token files are generated CSS without braces in
- * comments or strings.
- */
-export function parseCssBlocks(css: string): CssBlock[] {
-  const blocks: CssBlock[] = [];
-  const stack: Array<{ selector: string; bodyStart: number; hasChild: boolean }> = [];
-  let segStart = 0; // start of the text that will become the next selector
-  for (let i = 0; i < css.length; i++) {
-    const ch = css[i];
-    if (ch === "{") {
-      const selector = css.slice(segStart, i).trim();
-      const parent = stack[stack.length - 1];
-      if (parent) parent.hasChild = true;
-      stack.push({ selector, bodyStart: i + 1, hasChild: false });
-      segStart = i + 1;
-    } else if (ch === "}") {
-      const top = stack.pop();
-      if (top && !top.hasChild) {
-        const dark =
-          DARK_BLOCK.test(top.selector) ||
-          stack.some((s) => DARK_BLOCK.test(s.selector));
-        blocks.push({ bodyStart: top.bodyStart, bodyEnd: i, dark });
-      }
-      segStart = i + 1;
-    } else if (ch === ";") {
-      // Declarations end here: the next selector starts after this point.
-      segStart = i + 1;
-    }
-  }
-  return blocks;
-}
+// Block scanning and dark-mode classification are shared with the token
+// parsers (kit-tokens.ts, list-tokens) via css-blocks.ts, so what counts as
+// "dark" is defined exactly once. Re-exported for existing importers.
+export { parseCssBlocks } from "../../export/css-blocks.js";
 
 export type CssReplaceResult =
   | { ok: true; css: string; oldValue: string; replaced: number }
@@ -139,16 +94,24 @@ export function replaceTokenInCss(
     mode === "all" ? all : all.filter((h) => h.dark === (mode === "dark"));
   if (targets.length === 0) return { ok: false, reason: "not-in-mode" };
 
-  const oldValue = targets[0]!.value;
-  if (normalizeValue(oldValue) === normalizeValue(newValue)) {
-    return { ok: false, reason: "unchanged", oldValue };
+  // Only occurrences whose value actually differs get rewritten. "Unchanged"
+  // means EVERY targeted occurrence already matches: with mode "all" the
+  // base value may already match while the dark blocks differ, and aborting
+  // on the first occurrence alone would leave those dark blocks untouched.
+  const changed = targets.filter(
+    (t) => normalizeValue(t.value) !== normalizeValue(newValue)
+  );
+  if (changed.length === 0) {
+    return { ok: false, reason: "unchanged", oldValue: targets[0]!.value };
   }
 
   let out = css;
-  for (const t of [...targets].sort((a, b) => b.valueStart - a.valueStart)) {
+  for (const t of [...changed].sort((a, b) => b.valueStart - a.valueStart)) {
     out = out.slice(0, t.valueStart) + newValue + out.slice(t.valueEnd);
   }
-  return { ok: true, css: out, oldValue, replaced: targets.length };
+  // oldValue is the first value that actually changed: it feeds the
+  // tokens.json / layout.md sync, which must chase the replaced value.
+  return { ok: true, css: out, oldValue: changed[0]!.value, replaced: changed.length };
 }
 
 export function handler() {
@@ -221,17 +184,20 @@ export function handler() {
       css = res.css;
       const oldValue = res.oldValue;
 
-      // Update tokens.json: prefer the entry whose $extensions.mode matches
-      // the requested mode; files without a mode dimension match as before.
+      // Update tokens.json: when the file carries a mode dimension, only
+      // entries whose $extensions.mode matches the requested mode are
+      // eligible; there is NO cross-mode fallback, because matching by
+      // $value alone could rewrite an unrelated entry from the other mode
+      // that happens to share the old value, silently desyncing tokens.json
+      // from tokens.css. A miss is reported as a miss instead. Files
+      // without a mode dimension match by value as before.
       let jsonMatchPath: string | null = null;
       if (tokensJson) {
-        const useModeFilter = mode !== "all" && jsonHasModeDimension(tokensJson);
-        if (useModeFilter) {
+        if (mode !== "all" && jsonHasModeDimension(tokensJson)) {
           const filter = (entryMode: string | undefined): boolean =>
             mode === "dark" ? entryMode === "dark" : entryMode !== "dark";
           jsonMatchPath = updateJsonToken(tokensJson, oldValue, newValue, [], filter);
-        }
-        if (!jsonMatchPath) {
+        } else {
           jsonMatchPath = updateJsonToken(tokensJson, oldValue, newValue);
         }
       }

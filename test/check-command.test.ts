@@ -407,6 +407,61 @@ test(
   },
 );
 
+test(
+  "getChangedFiles resolves toplevel-relative git paths when the project is a repo subdirectory",
+  { skip: gitAvailable() ? false : "git not available" },
+  () => {
+    // Monorepo shape: the repository toplevel is NOT the project root. git
+    // prints changed paths relative to the toplevel, so resolving them
+    // against the project root used to double the path, drop every file,
+    // and let the gate pass with 0 files checked.
+    const repo = mkdtempSync(join(tmpdir(), "layout-check-mono-"));
+    try {
+      const git = (...args: string[]) =>
+        execFileSync("git", args, { cwd: repo, stdio: "ignore" });
+      git("init", "-b", "main");
+      git("config", "user.email", "test@example.com");
+      git("config", "user.name", "Test");
+
+      const project = join(repo, "packages", "app");
+      mkdirSync(join(project, ".layout"), { recursive: true });
+      writeFileSync(join(project, ".layout", "layout.md"), "# Test Kit\n");
+      writeFileSync(join(project, ".layout", "tokens.css"), TOKENS_CSS);
+      writeFileSync(join(project, "Clean.css"), CLEAN_CSS);
+      git("add", "-A");
+      git("commit", "-m", "base");
+
+      mkdirSync(join(project, "src"), { recursive: true });
+      writeFileSync(join(project, "src", "New.tsx"), DIRTY_TSX);
+      // A change outside the project root is not checkable and is dropped.
+      writeFileSync(join(repo, "Outside.tsx"), DIRTY_TSX);
+      git("add", "-A");
+      git("commit", "-m", "change");
+
+      const changed = getChangedFiles(project, "HEAD~1");
+      assert.ok(changed, "expected a change list inside a git repo");
+      assert.deepEqual(
+        changed.map((f) => path.relative(project, f).split(path.sep).join("/")),
+        ["src/New.tsx"],
+      );
+
+      // End to end: the gate fails on the changed dirty file instead of
+      // passing with zero files checked.
+      const { status, stdout } = runCli(project, [
+        "--changed",
+        "--base",
+        "HEAD~1",
+        "--warnings-as-errors",
+      ]);
+      assert.equal(status, 1);
+      assert.match(stdout, /hardcoded-colours/);
+      assert.match(stdout, /1 file checked/);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  },
+);
+
 test("getChangedFiles returns null when the base ref cannot be resolved", () => {
   const root = makeProject();
   try {
